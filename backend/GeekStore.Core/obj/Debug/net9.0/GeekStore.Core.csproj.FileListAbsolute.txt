@@ -1,0 +1,11 @@
+D:\DragonFly\GeekStore\backend\GeekStore.Core\bin\Debug\net9.0\GeekStore.Core.deps.json
+D:\DragonFly\GeekStore\backend\GeekStore.Core\bin\Debug\net9.0\GeekStore.Core.dll
+D:\DragonFly\GeekStore\backend\GeekStore.Core\bin\Debug\net9.0\GeekStore.Core.pdb
+D:\DragonFly\GeekStore\backend\GeekStore.Core\obj\Debug\net9.0\GeekStore.Core.GeneratedMSBuildEditorConfig.editorconfig
+D:\DragonFly\GeekStore\backend\GeekStore.Core\obj\Debug\net9.0\GeekStore.Core.AssemblyInfoInputs.cache
+D:\DragonFly\GeekStore\backend\GeekStore.Core\obj\Debug\net9.0\GeekStore.Core.AssemblyInfo.cs
+D:\DragonFly\GeekStore\backend\GeekStore.Core\obj\Debug\net9.0\GeekStore.Core.csproj.CoreCompileInputs.cache
+D:\DragonFly\GeekStore\backend\GeekStore.Core\obj\Debug\net9.0\GeekStore.Core.dll
+D:\DragonFly\GeekStore\backend\GeekStore.Core\obj\Debug\net9.0\refint\GeekStore.Core.dll
+D:\DragonFly\GeekStore\backend\GeekStore.Core\obj\Debug\net9.0\GeekStore.Core.pdb
+D:\DragonFly\GeekStore\backend\GeekStore.Core\obj\Debug\net9.0\ref\GeekStore.Core.dll

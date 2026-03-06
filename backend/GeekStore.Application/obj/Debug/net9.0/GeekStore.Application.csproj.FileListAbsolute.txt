@@ -1,0 +1,15 @@
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\GeekStore.Application.csproj.AssemblyReference.cache
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\GeekStore.Application.GeneratedMSBuildEditorConfig.editorconfig
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\GeekStore.Application.AssemblyInfoInputs.cache
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\GeekStore.Application.AssemblyInfo.cs
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\GeekStore.Application.csproj.CoreCompileInputs.cache
+D:\DragonFly\GeekStore\backend\GeekStore.Application\bin\Debug\net9.0\GeekStore.Application.deps.json
+D:\DragonFly\GeekStore\backend\GeekStore.Application\bin\Debug\net9.0\GeekStore.Application.dll
+D:\DragonFly\GeekStore\backend\GeekStore.Application\bin\Debug\net9.0\GeekStore.Application.pdb
+D:\DragonFly\GeekStore\backend\GeekStore.Application\bin\Debug\net9.0\GeekStore.Core.dll
+D:\DragonFly\GeekStore\backend\GeekStore.Application\bin\Debug\net9.0\GeekStore.Core.pdb
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\GeekStor.BD7F6355.Up2Date
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\GeekStore.Application.dll
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\refint\GeekStore.Application.dll
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\GeekStore.Application.pdb
+D:\DragonFly\GeekStore\backend\GeekStore.Application\obj\Debug\net9.0\ref\GeekStore.Application.dll
