@@ -4,6 +4,6 @@ namespace GeekStore.Application.Interfaces
 {
     public interface IImageValidationService
     {
-        Task<(bool IsSafe, string Reason)> ValidateImageAsync(string imageUrl);
+        Task<(bool IsSafe, string Reason)> ValidateImageAsync(byte[] imageBytes, string mimeType);
     }
 }

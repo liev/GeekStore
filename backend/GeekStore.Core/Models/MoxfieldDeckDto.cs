@@ -19,6 +19,9 @@ namespace GeekStore.Core.Models
 
         [JsonPropertyName("mainboard")]
         public Dictionary<string, MoxfieldCardDto> Mainboard { get; set; } = new();
+
+        [JsonPropertyName("sideboard")]
+        public Dictionary<string, MoxfieldCardDto> Sideboard { get; set; } = new();
     }
 
     public class MoxfieldCardDto
@@ -40,5 +43,15 @@ namespace GeekStore.Core.Models
         
         [JsonPropertyName("scryfall_id")]
         public string ScryfallId { get; set; } = string.Empty;
+
+        public string ImageUrl => !string.IsNullOrEmpty(ScryfallId) 
+            ? $"https://api.scryfall.com/cards/{ScryfallId}?format=image" 
+            : "";
+    }
+
+    public class MoxfieldImportRequest
+    {
+        public int SellerId { get; set; }
+        public bool ImportIndividually { get; set; }
     }
 }

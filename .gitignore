@@ -1,0 +1,41 @@
+# ==========================================
+# GeekStore — .gitignore
+# ==========================================
+
+# ── .NET / Backend ──────────────────────────
+bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+*.user
+*.suo
+*.cache
+*.log
+.vs/
+appsettings.Development.json
+
+# ── Node / Frontend ─────────────────────────
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# ── IDE ─────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── OS ──────────────────────────────────────
+Thumbs.db
+.DS_Store
+
+# ── Misc / Temp ─────────────────────────────
+diff.txt
+*.tmp
+eslint_report.json
+eslint_compact.txt
+lint_output.json
+lint_output_utf8.json

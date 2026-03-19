@@ -2,11 +2,10 @@ using System;
 using System.Text.Json;
 using System.Threading.Tasks;
 using GeekStore.Application.Interfaces;
-// Assuming using Vertex AI/Gemini or a direct REST call if the SDK is heavy.
-// To keep it clean and adaptable to the provided raw API Key, a direct HTTP Client approach is often bulletproof for simple prompts.
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 
 namespace GeekStore.Infrastructure.Services
 {
@@ -15,42 +14,110 @@ namespace GeekStore.Infrastructure.Services
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
 
-        public GeminiVisionService(HttpClient httpClient)
+        public GeminiVisionService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            // In a real app, this comes from IConfiguration. Hardcoded for the prototype context or injected.
-            _apiKey = "AIzaSyDkCrgfJHpf2y7YK4-1gP6rtWFSxS9EkJY"; 
+            _apiKey = configuration["Gemini:ApiKey"]
+                ?? throw new InvalidOperationException("Gemini:ApiKey is not configured. Set it via environment variable Gemini__ApiKey.");
         }
 
-        public async Task<(bool IsSafe, string Reason)> ValidateImageAsync(string imageUrl)
+
+        public async Task<(bool IsSafe, string Reason)> ValidateImageAsync(byte[] imageBytes, string mimeType)
         {
-            // Note: For a real base64 or remote URL, you construct the Gemini REST Payload.
-            // Documentation for Gemini 1.5 Pro/Flash Vision:
-            // POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}
-            
-            var requestUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
-            
-            var payload = new
+            if (_apiKey.Contains("SET_VIA_ENV_VAR"))
             {
-                contents = new[]
+                // Bypass for development if no key is provided
+                return (true, "Auto-aprobado (Modo Desarrollo/Sin API Key)");
+            }
+
+            try
+            {
+                // 1. Convert to base64
+                var base64Image = Convert.ToBase64String(imageBytes);
+
+                // 2. Construct Gemini Request
+                var requestUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
+                
+                var payload = new
                 {
-                    new
+                    contents = new[]
                     {
-                        parts = new object[]
+                        new
                         {
-                            new { text = "Analyze this image. Determine if it is related to Geek culture (trading cards like Magic Pokemon, anime figures, video games). If it is NSFW (+18) or completely unrelated (like a picture of a regular mug or car), return IsSafe: false. Otherwise return IsSafe: true. Respond ONLY in valid JSON format: {\"IsSafe\": true/false, \"Reason\": \"short explanation\"}." },
-                            // If the image is a URL, Gemini requires downloading it to base64 or passing a gs:// uri if using Vertex. 
-                            // Since Cloudinary URLs are public, we typically download the bytes here and send them as inlineData.
-                            // For simplicity in scaffolding, this represents the structural payload.
+                            parts = new object[]
+                            {
+                                new { text = "Analyze this image. Determine if it is related to Geek culture (trading cards like Magic Pokemon, anime figures, video games). If it is NSFW (+18) or completely unrelated (like a picture of a regular mug or car), return IsSafe: false. Otherwise return IsSafe: true. Respond ONLY in valid JSON format: {\"IsSafe\": true/false, \"Reason\": \"short explanation\"}." },
+                                new
+                                {
+                                    inlineData = new
+                                    {
+                                        mimeType = mimeType,
+                                        data = base64Image
+                                    }
+                                }
+                            }
                         }
+                    },
+                    generationConfig = new
+                    {
+                        responseMimeType = "application/json"
+                    }
+                };
+
+                var jsonPayload = JsonSerializer.Serialize(payload);
+                var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+                // 3. Send Request
+                var response = await _httpClient.PostAsync(requestUrl, content);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Gemini API Error: {err}");
+                    // Fallback gracefullly allowing upload if AI is down
+                    return (true, "AI Moderation service unavailable (Bypassed).");
+                }
+
+                var responseString = await response.Content.ReadAsStringAsync();
+                
+                // 4. Parse Response
+                using var document = JsonDocument.Parse(responseString);
+                var root = document.RootElement;
+                
+                var candidates = root.GetProperty("candidates");
+                if (candidates.GetArrayLength() > 0)
+                {
+                    var textResponse = candidates[0]
+                        .GetProperty("content")
+                        .GetProperty("parts")[0]
+                        .GetProperty("text")
+                        .GetString();
+
+                    if (!string.IsNullOrEmpty(textResponse))
+                    {
+                        // Clean markdown formatting if any
+                        textResponse = textResponse.Trim().Trim('`');
+                        if (textResponse.StartsWith("json"))
+                        {
+                            textResponse = textResponse.Substring(4).Trim();
+                        }
+
+                        using var resultDoc = JsonDocument.Parse(textResponse);
+                        var isSafe = resultDoc.RootElement.GetProperty("IsSafe").GetBoolean();
+                        var reason = resultDoc.RootElement.GetProperty("Reason").GetString() ?? "";
+                        
+                        return (isSafe, reason);
                     }
                 }
-            };
 
-            // Implementation details omitted for brevity during scaffolding.
-            // We would serialize, POST, and deserialize the JSON response.
-            
-            return (true, "Mock implementation for scaffolding.");
+                return (true, "Could not parse AI response (Bypassed).");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error validating image: {ex.Message}");
+                // Fallback gracefully on exception to not block sellers
+                return (true, "Error occurred during AI validation (Bypassed).");
+            }
         }
     }
 }

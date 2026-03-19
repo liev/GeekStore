@@ -2,6 +2,9 @@ import { Routes, Route, useNavigate } from 'react-router-dom';
 import Catalog from './pages/Catalog';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import AdminPanel from './pages/AdminPanel';
+import MyPurchases from './pages/MyPurchases';
+import Profile from './pages/Profile';
 
 function Home() {
   const navigate = useNavigate();
@@ -13,12 +16,22 @@ function Home() {
 
       {/* Content */}
       <div className="z-10 relative text-center">
-        <h1 className="text-6xl md:text-8xl font-display font-black text-transparent bg-clip-text bg-gradient-to-r from-neon-blue via-white to-neon-pink text-glow-blue tracking-tight mb-6 p-4">
-          MERCADITO GEEK
-        </h1>
-        <p className="text-lg md:text-xl mt-4 font-retro text-neon-yellow tracking-widest uppercase mb-12 opacity-90">
-          [ Insertar Moneda para Ver el Catálogo ]
-        </p>
+        {/* Logo + Title */}
+        <div className="flex flex-col items-center mb-10">
+          <img
+            src="/logo.png"
+            alt="GOBLIN SPOT Logo"
+            className="w-72 sm:w-[22rem] md:w-[28rem] mx-auto drop-shadow-[0_0_30px_rgba(74,222,128,0.6)] animate-pulse-slow mix-blend-screen"
+          />
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-black tracking-tight -mt-4">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400 drop-shadow-[0_0_12px_rgba(74,222,128,0.8)]">GOBLIN</span>
+            {' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-pink-500 drop-shadow-[0_0_12px_rgba(217,70,239,0.8)]">SPOT</span>
+          </h1>
+          <p className="text-xs sm:text-sm font-retro text-neon-yellow tracking-[0.25em] uppercase mt-3 opacity-70">
+            [ Insertar Moneda para Entrar ]
+          </p>
+        </div>
 
         <div
           onClick={() => navigate('/catalog')}
@@ -26,20 +39,31 @@ function Home() {
         >
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-neon-blue to-neon-pink rounded-t-2xl opacity-80 group-hover:opacity-100 transition-opacity"></div>
           <h2 className="text-3xl text-white mb-3 font-display font-bold tracking-wide">ENTRAR AL CATÁLOGO</h2>
-          <p className="text-slate-300 font-sans leading-relaxed">Descubre TCGs seleccionados, Figuras de colección y Mazos exclusivos de Moxfield en toda Costa Rica.</p>
+          <p className="text-slate-300 font-sans leading-relaxed">Descubre el mejor mercado de TCGs, juegos de mesa, figuras de colección, y más en Costa Rica. Compra, vende e intercambia como quieras!!!</p>
         </div>
+
+        <button
+          onClick={() => navigate('/login')}
+          className="mt-4 max-w-lg mx-auto w-full glass-panel border border-neon-pink/30 text-neon-pink font-sans font-semibold px-6 py-3 rounded-xl hover:bg-neon-pink/10 hover:border-neon-pink transition-all duration-300 tracking-widest uppercase text-sm"
+        >
+          ⚔ Acceso a Vendedores / Goblins
+        </button>
       </div>
     </div>
   );
 }
+
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/catalog" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Catalog /></div>} />
+      <Route path="/my-purchases" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><MyPurchases /></div>} />
+      <Route path="/profile/:id" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Profile /></div>} />
       <Route path="/dashboard" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Dashboard /></div>} />
       <Route path="/login" element={<Login />} />
+      <Route path="/admin" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><AdminPanel /></div>} />
     </Routes>
   );
 }

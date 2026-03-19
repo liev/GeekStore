@@ -12,7 +12,14 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler =
+            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.DefaultIgnoreCondition =
+            System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
 
 // Configure JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "ThisIsASecretKeyForJWTTokenGenerationEnsureItIsAtLeast32BytesLong!";
@@ -54,13 +61,22 @@ builder.Services.AddDbContext<GeekStoreDbContext>(options =>
 // DI - Repositories
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IUserFollowRepository, UserFollowRepository>();
+
+// WhatsApp Service
+builder.Services.AddHttpClient<IWhatsAppService, WhatsAppProviderService>();
+builder.Services.AddScoped<IWhatsAppService, WhatsAppProviderService>();
 
 // DI - Business Services
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IImageValidationService, GeminiVisionService>();
+builder.Services.AddScoped<ISellerAnalysisService, GeminiSellerAnalysisService>();
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IMoxfieldService, MoxfieldService>();
 builder.Services.AddHttpClient<GeminiVisionService>();
+builder.Services.AddHttpClient<GeminiSellerAnalysisService>();
 builder.Services.AddHttpClient<MoxfieldService>();
 
 var app = builder.Build();
