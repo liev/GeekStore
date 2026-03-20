@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, Box, User, SlidersHorizontal, ChevronDown, X } from 'lucide-react';
+import { Search, ShoppingCart, Box, User, SlidersHorizontal, ChevronDown, X, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AdsBar from '../components/AdsBar';
-import { catalogApi, categoriesApi, ordersApi, type Product, type Category as ApiCategory } from '../api/client';
+import { catalogApi, categoriesApi, ordersApi, type Product, type Category as ApiCategory, type OrderSellerInfo } from '../api/client';
 export interface CartItem {
     product: Product;
     quantity: number;
@@ -137,6 +137,7 @@ export default function Catalog() {
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [showCheckout, setShowCheckout] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState(false);
+    const [orderSellers, setOrderSellers] = useState<OrderSellerInfo[]>([]);
     const [buyerName, setBuyerName] = useState('');
     const [buyerEmail, setBuyerEmail] = useState('');
     const [buyerPhone, setBuyerPhone] = useState('');
@@ -269,7 +270,7 @@ export default function Catalog() {
         }
 
         try {
-            await ordersApi.createOrder({
+            const result = await ordersApi.createOrder({
                 deliveryMethod: buyerAddress ? 'Shipping' : 'Pickup',
                 shippingAddress: buyerAddress,
                 buyerPhone: buyerPhone,
@@ -279,14 +280,9 @@ export default function Catalog() {
                 }))
             }, token);
 
+            setOrderSellers(result.sellers || []);
             setOrderSuccess(true);
-            setTimeout(() => {
-                setOrderSuccess(false);
-                setShowCheckout(false);
-                setCart([]);
-                setIsCartOpen(false);
-                setBuyerName(''); setBuyerEmail(''); setBuyerPhone(''); setBuyerAddress('');
-            }, 2500);
+            // Don't auto-dismiss — let the user interact with the wa.me links
         } catch (e) {
             if (e instanceof Error) {
                 alert(e.message);
@@ -627,11 +623,61 @@ export default function Catalog() {
                             className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
 
                         {orderSuccess ? (
-                            /* ✅ Success */
-                            <div className="text-center py-10">
+                            /* ✅ Success + wa.me links */
+                            <div className="text-center py-6">
                                 <div className="text-6xl mb-4">🎉</div>
                                 <h2 className="text-2xl font-display font-bold text-green-400 mb-2">¡Pedido Confirmado!</h2>
-                                <p className="text-slate-300 font-sans">Pronto recibirás información de contacto del vendedor.</p>
+                                <p className="text-slate-300 font-sans mb-6">Contacta a tus vendedores por WhatsApp para coordinar el pago y entrega.</p>
+                                
+                                <div className="space-y-3 mb-6">
+                                    {orderSellers.map((s) => {
+                                        const cleanPhone = (s.sellerPhone || '').replace(/[^\d]/g, '');
+                                        const waMessage = encodeURIComponent(
+                                            `¡Hola ${s.sellerNickname || 'vendedor'}! 👋\n` +
+                                            `Acabo de hacer un pedido en Goblin Spot por ₡${s.totalAmountCRC.toLocaleString('es-CR')}.\n` +
+                                            `Mi nombre es ${buyerName}. ¿Podemos coordinar el pago y la entrega?`
+                                        );
+                                        const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${waMessage}` : '';
+                                        
+                                        return (
+                                            <div key={s.sellerId} className="glass-panel border border-slate-700 rounded-xl p-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="text-left">
+                                                        <p className="text-white font-semibold text-sm">{s.sellerNickname || `Vendedor #${s.sellerId}`}</p>
+                                                        <p className="text-neon-blue text-xs font-bold">₡{s.totalAmountCRC.toLocaleString('es-CR')}</p>
+                                                    </div>
+                                                    {waUrl ? (
+                                                        <a
+                                                            href={waUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-2 bg-green-500 hover:bg-green-400 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-green-500/20 hover:shadow-green-500/40 hover:-translate-y-0.5"
+                                                        >
+                                                            <MessageCircle size={16} />
+                                                            WhatsApp
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-500 italic">Sin teléfono registrado</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        setOrderSuccess(false);
+                                        setShowCheckout(false);
+                                        setCart([]);
+                                        setIsCartOpen(false);
+                                        setOrderSellers([]);
+                                        setBuyerName(''); setBuyerEmail(''); setBuyerPhone(''); setBuyerAddress('');
+                                    }}
+                                    className="text-slate-500 hover:text-white text-sm font-sans transition-colors"
+                                >
+                                    Cerrar y volver al catálogo
+                                </button>
                             </div>
                         ) : showCheckout ? (
                             /* 🧾 Checkout form */

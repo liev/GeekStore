@@ -679,7 +679,7 @@ export default function Dashboard() {
                                         placeholder="+506 8888-8888"
                                     />
                                     <p className="text-xs text-slate-400">
-                                        Este número será compartido con los compradores que ordenen tus productos en el carrito para que te contacten directamente por WhatsApp. También recibirás notificaciones aquí.
+                                        Este número será compartido con los compradores que ordenen tus productos — verán un botón de WhatsApp para contactarte directamente y coordinar el pago y entrega.
                                     </p>
                                 </div>
 

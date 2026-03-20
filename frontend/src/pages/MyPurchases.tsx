@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ordersApi, type Order } from '../api/client';
 import { useNavigate } from 'react-router-dom';
-import { Package, Clock, CheckCircle } from 'lucide-react';
+import { Package, Clock, CheckCircle, MessageCircle } from 'lucide-react';
 
 export default function MyPurchases() {
     const [orders, setOrders] = useState<Order[]>([]);
@@ -106,6 +106,29 @@ export default function MyPurchases() {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* WhatsApp Contact Button */}
+                                {order.seller?.phoneNumber && (() => {
+                                    const cleanPhone = order.seller.phoneNumber!.replace(/[^\d]/g, '');
+                                    const waMessage = encodeURIComponent(
+                                        `¡Hola ${order.seller.nickname || 'vendedor'}! 👋\n` +
+                                        `Te escribo sobre mi orden #${order.id} en Goblin Spot por ₡${order.totalAmountCRC.toLocaleString('es-CR')}.\n` +
+                                        `¿Podemos coordinar el pago y la entrega?`
+                                    );
+                                    return (
+                                        <div className="mt-4 pt-4 border-t border-slate-800">
+                                            <a
+                                                href={`https://wa.me/${cleanPhone}?text=${waMessage}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-400 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-green-500/20 hover:shadow-green-500/40 hover:-translate-y-0.5"
+                                            >
+                                                <MessageCircle size={16} />
+                                                Contactar por WhatsApp
+                                            </a>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         ))}
                     </div>

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi, settingsApi } from '../api/client';
-import { CreditCard, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -23,7 +24,6 @@ export default function Login() {
 
     // Payment State
     const [showPayment, setShowPayment] = useState(false);
-    const [paymentCard, setPaymentCard] = useState('');
 
     // Email Verification State
     const [showVerification, setShowVerification] = useState(false);
@@ -121,8 +121,11 @@ export default function Login() {
             setLoading(true);
             try {
                 const success = await authApi.register({
-                    name: regName, surname: regSurname,
-                    nickname: regNickname, email: regEmail, password: regPassword
+                    Name: regName,
+                    Surname: regSurname,
+                    Nickname: regNickname,
+                    Email: regEmail,
+                    Password: regPassword
                 });
                 if (success) {
                     setVerifyEmail(regEmail);
@@ -139,15 +142,13 @@ export default function Login() {
         setError('');
         setLoading(true);
 
-        await new Promise(r => setTimeout(r, 1000));
-
         try {
             const success = await authApi.register({
-                name: regName,
-                surname: regSurname,
-                nickname: regNickname,
-                email: regEmail,
-                password: regPassword
+                Name: regName,
+                Surname: regSurname,
+                Nickname: regNickname,
+                Email: regEmail,
+                Password: regPassword
             });
 
             if (success) {
@@ -295,31 +296,42 @@ export default function Login() {
                                 </div>
                             )}
                             <div className="bg-slate-900/50 border border-neon-blue/50 p-4 rounded-xl text-center">
-                                <p className="text-slate-400 font-sans text-sm mb-1">Costo Mensual de Identificación:</p>
+                                <p className="text-slate-400 font-sans text-sm mb-1">Costo Mensual de Indentificación:</p>
                                 <p className="text-3xl font-display font-bold text-white">₡{sellerFee}</p>
+                                <p className="text-sm font-retro text-slate-400 tracking-wider mb-2">~ ${(parseFloat(sellerFee) / 500).toFixed(2)} USD</p>
                                 <p className="text-xs text-neon-pink mt-2">* Membresía auto-renovable mensualmente</p>
                             </div>
 
-                            <div className="space-y-2 mt-4">
-                                <label className="block text-slate-300 font-sans font-medium text-sm flex gap-2 items-center">
-                                    <CreditCard size={16} className="text-neon-blue" /> NÚMERO DE TARJETA
-                                </label>
-                                <input
-                                    type="text"
-                                    value={paymentCard}
-                                    onChange={(e) => setPaymentCard(e.target.value)}
-                                    className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-blue rounded-lg text-white p-3.5 font-retro outline-none transition-colors shadow-inner tracking-widest"
-                                    placeholder="0000 0000 0000 0000"
-                                />
+                            <div className="space-y-4 max-w-sm mx-auto z-20 relative mt-6">
+                                <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", currency: "USD", intent: "capture" }}>
+                                    <PayPalButtons
+                                        style={{ layout: "vertical", shape: "pill", color: "gold" }}
+                                        createOrder={(_data, actions) => {
+                                            return actions.order.create({
+                                                intent: "CAPTURE",
+                                                purchase_units: [
+                                                    {
+                                                        description: "Suscripción Instalación Vendedor GeekStore",
+                                                        amount: { value: (parseFloat(sellerFee) / 500).toFixed(2), currency_code: "USD" }
+                                                    }
+                                                ],
+                                            });
+                                        }}
+                                        onApprove={async (_data, actions) => {
+                                            if (!actions.order) return;
+                                            try {
+                                                await actions.order.capture();
+                                                await handlePayment();
+                                            } catch (err) {
+                                                setError(err instanceof Error ? err.message : "Error al procesar el pago con PayPal.");
+                                            }
+                                        }}
+                                        onError={() => {
+                                            setError("Hubo un error al conectar con PayPal.");
+                                        }}
+                                    />
+                                </PayPalScriptProvider>
                             </div>
-
-                            <button
-                                onClick={handlePayment}
-                                disabled={loading || paymentCard.length < 16}
-                                className={`w-full bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-900 font-sans font-bold text-lg py-4 rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-1 ${loading || paymentCard.length < 16 ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-emerald-400/40'}`}
-                            >
-                                {loading ? 'PROCESANDO TRANSACCIÓN...' : 'AUTORIZAR PAGO'}
-                            </button>
 
                             <button
                                 onClick={() => setShowPayment(false)}

@@ -64,10 +64,6 @@ builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IUserFollowRepository, UserFollowRepository>();
 
-// WhatsApp Service
-builder.Services.AddHttpClient<IWhatsAppService, WhatsAppProviderService>();
-builder.Services.AddScoped<IWhatsAppService, WhatsAppProviderService>();
-
 // DI - Business Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();

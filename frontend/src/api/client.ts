@@ -15,6 +15,7 @@ export interface Seller {
     id: number;
     name: string;
     nickname: string;
+    phoneNumber?: string;
 }
 
 export interface Product {
@@ -447,8 +448,15 @@ export interface Order {
     items: OrderItem[];
 }
 
+export interface OrderSellerInfo {
+    sellerId: number;
+    sellerNickname: string;
+    sellerPhone: string;
+    totalAmountCRC: number;
+}
+
 export const ordersApi = {
-    createOrder: async (data: CreateOrderDto, token: string): Promise<{ message: string, orderCount: number }> => {
+    createOrder: async (data: CreateOrderDto, token: string): Promise<{ message: string; orderCount: number; sellers: OrderSellerInfo[] }> => {
         const res = await fetchApi(`${API_BASE_URL}/Orders`, {
             method: 'POST',
             headers: { 

@@ -19,18 +19,15 @@ namespace GeekStore.Api.Controllers
         private readonly IOrderRepository _orderRepository;
         private readonly IProductRepository _productRepository;
         private readonly IRepository<User> _userRepository;
-        private readonly IWhatsAppService _whatsAppService;
 
         public OrdersController(
             IOrderRepository orderRepository, 
             IProductRepository productRepository,
-            IRepository<User> userRepository,
-            IWhatsAppService whatsAppService)
+            IRepository<User> userRepository)
         {
             _orderRepository = orderRepository;
             _productRepository = productRepository;
             _userRepository = userRepository;
-            _whatsAppService = whatsAppService;
         }
 
         [HttpPost]
@@ -87,36 +84,20 @@ namespace GeekStore.Api.Controllers
                 try
                 {
                     var savedOrder = await _orderRepository.CreateOrderWithItemsAsync(order, orderItems);
-                    createdOrders.Add(savedOrder);
-                    
-                    // Trigger WhatsApp Notifications
-                    var seller = await _userRepository.GetByIdAsync(sellerGroup.Key);
-                    var buyer = await _userRepository.GetByIdAsync(buyerId);
 
-                    // If user provides a phone on checkout, optionally ensure the user entity is updated too for the future
+                    // Resolve seller info for the response
+                    var seller = await _userRepository.GetByIdAsync(sellerGroup.Key);
+                    savedOrder.Seller = seller;
+
+                    // If user provides a phone on checkout, update buyer entity for future reference
+                    var buyer = await _userRepository.GetByIdAsync(buyerId);
                     if (buyer != null && request.BuyerPhone != null && buyer.PhoneNumber != request.BuyerPhone)
                     {
                         buyer.PhoneNumber = request.BuyerPhone;
                         await _userRepository.UpdateAsync(buyer);
                     }
 
-                    if (seller != null && !string.IsNullOrEmpty(seller.PhoneNumber))
-                    {
-                        await _whatsAppService.SendMessageAsync(seller.PhoneNumber, 
-                            $"🛒 ¡Hola {seller.Nickname}! Tienes una nueva orden P2P.\n" +
-                            $"👤 {buyer?.Nickname ?? "Un usuario"} quiere comprar artículos por ₡{totalAmount:N0}.\n" +
-                            $"📱 Su WhatsApp es: {request.BuyerPhone}\n\n" +
-                            $"¡Ponte en contacto para coordinar el pago y envío!");
-                    }
-
-                    if (!string.IsNullOrEmpty(request.BuyerPhone))
-                    {
-                        await _whatsAppService.SendMessageAsync(request.BuyerPhone, 
-                            $"✅ ¡Hola {buyer?.Nickname ?? "usuario"}! Tu orden P2P por ₡{totalAmount:N0} fue creada.\n" +
-                            $"El vendedor es {seller?.Nickname}.\n" +
-                            $"📱 Su WhatsApp es: {seller?.PhoneNumber}\n\n" +
-                            $"¡Contacta al vendedor para finalizar tu compra!");
-                    }
+                    createdOrders.Add(savedOrder);
                 }
                 catch (DbUpdateConcurrencyException)
                 {
@@ -124,7 +105,17 @@ namespace GeekStore.Api.Controllers
                 }
             }
 
-            return Ok(new { message = "Órdenes creadas con éxito", orderCount = createdOrders.Count });
+            // Return seller contact info so the frontend can generate wa.me links
+            return Ok(new {
+                message = "Órdenes creadas con éxito",
+                orderCount = createdOrders.Count,
+                sellers = createdOrders.Select(o => new {
+                    sellerId = o.SellerId,
+                    sellerNickname = o.Seller?.Nickname,
+                    sellerPhone = o.Seller?.PhoneNumber,
+                    totalAmountCRC = o.TotalAmountCRC
+                })
+            });
         }
 
 
