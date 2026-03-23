@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ShoppingCart, Box, User, SlidersHorizontal, ChevronDown, X, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import AdsBar from '../components/AdsBar';
 import { catalogApi, categoriesApi, ordersApi, type Product, type Category as ApiCategory, type OrderSellerInfo } from '../api/client';
 export interface CartItem {
     product: Product;
@@ -359,10 +358,6 @@ export default function Catalog() {
                         </button>
                     </div>
                 </header>
-
-                <div className="mb-6 -mx-4 sm:-mx-8">
-                    <AdsBar />
-                </div>
 
                 {/* Filters Bar */}
                 <div className="glass-panel rounded-xl p-4 mb-10 shadow-xl space-y-4">
