@@ -17,6 +17,8 @@ namespace GeekStore.Infrastructure.Data
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<UserFollow> UserFollows { get; set; }
+        public DbSet<Review> Reviews { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -38,12 +40,37 @@ namespace GeekStore.Infrastructure.Data
                 .HasForeignKey(uf => uf.FollowedId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Configure Review -> User relationships
+            modelBuilder.Entity<Review>()
+                .HasOne(r => r.Reviewer)
+                .WithMany()
+                .HasForeignKey(r => r.ReviewerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Review>()
+                .HasOne(r => r.Seller)
+                .WithMany()
+                .HasForeignKey(r => r.SellerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // One review per buyer-seller pair
+            modelBuilder.Entity<Review>()
+                .HasIndex(r => new { r.ReviewerId, r.SellerId })
+                .IsUnique();
+
             // Configure Order -> User relationships to prevent multiple cascade paths
             modelBuilder.Entity<Order>()
                 .HasOne(o => o.Buyer)
                 .WithMany()
                 .HasForeignKey(o => o.BuyerId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure Notification -> User relationship
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.User)
+                .WithMany()
+                .HasForeignKey(n => n.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Order>()
                 .HasOne(o => o.Seller)

@@ -54,15 +54,20 @@ builder.Services.AddCors(options =>
         });
 });
 
-// DI - Database
+// DI - Database (PostgreSQL)
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? "Host=localhost;Port=5432;Database=geekstore;Username=geekstore;Password=geekstore123";
 builder.Services.AddDbContext<GeekStoreDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=geekstore.db"));
+    options.UseNpgsql(connectionString));
 
 // DI - Repositories
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IUserFollowRepository, UserFollowRepository>();
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
 // DI - Business Services
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -76,6 +81,13 @@ builder.Services.AddHttpClient<GeminiSellerAnalysisService>();
 builder.Services.AddHttpClient<MoxfieldService>();
 
 var app = builder.Build();
+
+// Auto-create/migrate the database on startup (dev convenience)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<GeekStoreDbContext>();
+    db.Database.EnsureCreated();
+}
 
 app.UseHttpsRedirection();
 

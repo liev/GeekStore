@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, Box, User, SlidersHorizontal, ChevronDown, X, MessageCircle } from 'lucide-react';
+import { Search, ShoppingCart, User, SlidersHorizontal, ChevronDown, X, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { catalogApi, categoriesApi, ordersApi, type Product, type Category as ApiCategory, type OrderSellerInfo } from '../api/client';
+import { catalogApi, categoriesApi, ordersApi, reviewsApi, type Product, type Category as ApiCategory, type OrderSellerInfo, type ReviewSummary } from '../api/client';
+import { StarRatingCompact } from './Profile';
+import NotificationBell from '../components/NotificationBell';
 export interface CartItem {
     product: Product;
     quantity: number;
@@ -20,7 +22,7 @@ const INTEREST_TAGS = [
 ];
 
 // ── Compact Temu-style ProductCard ───────────────────────────────────────
-function ProductCard({ product, onAddToCart }: { product: Product; onAddToCart: (p: Product, q: number) => void }) {
+function ProductCard({ product, onAddToCart, ratingData }: { product: Product; onAddToCart: (p: Product, q: number) => void; ratingData?: ReviewSummary }) {
     const navigate = useNavigate();
     const images = [product.imageUrl, product.imageUrl2, product.imageUrl3].filter(u => u && u.trim() !== '');
     if (images.length === 0) images.push('');
@@ -87,6 +89,9 @@ function ProductCard({ product, onAddToCart }: { product: Product; onAddToCart: 
                         <User size={10} /> {product.seller.nickname}
                     </button>
                 )}
+                {ratingData && ratingData.reviewCount > 0 && (
+                    <StarRatingCompact rating={Math.round(ratingData.averageRating)} count={ratingData.reviewCount} />
+                )}
                 <p className="text-xs text-slate-500 line-clamp-1 flex-grow mb-2">{product.description}</p>
 
                 <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-800">
@@ -149,6 +154,9 @@ export default function Catalog() {
     const sellerRef = useRef<HTMLDivElement>(null);
     const [sortOrder, setSortOrder] = useState('default');
     const [showFilters, setShowFilters] = useState(false);
+
+    // ── Seller Ratings Cache ─────────────────────────────────────────────
+    const [sellerRatings, setSellerRatings] = useState<Map<number, ReviewSummary>>(new Map());
 
     // ── Interests system ──────────────────────────────────────────────────
     const storedInterests = (): Set<string> => {
@@ -246,16 +254,34 @@ export default function Catalog() {
         return () => { isMounted = false; };
     }, [debouncedSearch, activeCategory, conditionFilter, page]);
 
-    // Pre-fill buyer info from logged-in seller JWT if available
+    // Fetch seller ratings when products change
+    useEffect(() => {
+        if (products.length === 0) return;
+        const sellerIds = [...new Set(products.map(p => p.sellerId))];
+        const fetchRatings = async () => {
+            const entries = await Promise.all(
+                sellerIds.map(async (sid) => {
+                    const summary = await reviewsApi.getSellerSummary(sid);
+                    return [sid, summary] as [number, ReviewSummary];
+                })
+            );
+            setSellerRatings(new Map(entries));
+        };
+        fetchRatings();
+    }, [products]);
+
     const openCheckout = () => {
         const token = localStorage.getItem('geekstore_token');
-        if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                const email = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] ?? payload.email ?? payload.Email ?? '';
-                if (email) setBuyerEmail(email);
-            } catch { /* ignore */ }
+        if (!token) {
+            alert("Debes iniciar sesión o crear una cuenta para comprar (Seguridad P2P).");
+            navigate('/login');
+            return;
         }
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const email = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] ?? payload.email ?? payload.Email ?? '';
+            if (email) setBuyerEmail(email);
+        } catch { /* ignore */ }
         setShowCheckout(true);
     };
 
@@ -264,7 +290,7 @@ export default function Catalog() {
         
         const token = localStorage.getItem('geekstore_token');
         if (!token) {
-            alert("Debes tener una sesión activa o crear una cuenta para comprar (Seguridad P2P).");
+            navigate('/login');
             return;
         }
 
@@ -340,13 +366,14 @@ export default function Catalog() {
                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-pink to-purple-500">SPOT</span>
                         </h1>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full md:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full md:w-auto items-center">
                         <button
                             onClick={() => setShowInterestModal(true)}
                             className="w-full sm:w-auto glass-panel text-neon-yellow font-sans font-medium px-4 py-2.5 rounded-lg hover:bg-slate-800 transition-colors border border-neon-yellow/30 text-sm flex items-center gap-2"
                         >
                             ✦ {userInterests.size > 0 ? `Mis intereses (${userInterests.size})` : 'Personalizar'}
                         </button>
+                        {(() => { const t = localStorage.getItem('geekstore_token'); return t ? <NotificationBell token={t} /> : null; })()}
                         <button onClick={() => navigate('/login')} className="w-full sm:w-auto glass-panel text-white font-sans font-medium px-5 py-2.5 rounded-lg hover:bg-slate-800 transition-colors border border-slate-600/50">
                             Acceso a Vendedores
                         </button>
@@ -528,11 +555,17 @@ export default function Catalog() {
 
                 {/* Grid */}
                 {loading ? (
-                    <div className="flex justify-center items-center mt-32">
-                        <div className="text-center font-retro text-neon-blue animate-pulse flex flex-col items-center gap-4">
-                            <Box className="w-12 h-12 animate-spin-slow" />
-                            <p>DESCIFRANDO DATOS...</p>
-                        </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pb-6">
+                        {[...Array(10)].map((_, i) => (
+                            <div key={i} className="bg-slate-900/80 rounded-xl overflow-hidden border border-slate-800 flex flex-col animate-pulse">
+                                <div className="aspect-square bg-slate-800/50 w-full"></div>
+                                <div className="p-3 flex flex-col flex-grow gap-2">
+                                    <div className="h-4 bg-slate-800 rounded w-3/4"></div>
+                                    <div className="h-3 bg-slate-800 rounded w-1/2"></div>
+                                    <div className="h-8 bg-slate-800 rounded w-full mt-auto"></div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 ) : (
                     <>
@@ -570,6 +603,7 @@ export default function Catalog() {
                                 <ProductCard
                                     key={product.id}
                                     product={product}
+                                    ratingData={sellerRatings.get(product.sellerId)}
                                     onAddToCart={(p, q) => {
                                         setCart(prev => {
                                             const existing = prev.find(item => item.product.id === p.id);
@@ -692,6 +726,7 @@ export default function Catalog() {
                                     <div>
                                         <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Correo electrónico *</label>
                                         <input type="email" value={buyerEmail} onChange={e => setBuyerEmail(e.target.value)}
+                                            autoComplete="email"
                                             className="w-full bg-slate-900 border border-slate-700 rounded-lg text-white p-3 text-sm focus:outline-none focus:border-neon-blue transition-colors"
                                             placeholder="tu@correo.com" />
                                     </div>

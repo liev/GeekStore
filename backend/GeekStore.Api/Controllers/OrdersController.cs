@@ -19,15 +19,18 @@ namespace GeekStore.Api.Controllers
         private readonly IOrderRepository _orderRepository;
         private readonly IProductRepository _productRepository;
         private readonly IRepository<User> _userRepository;
+        private readonly INotificationRepository _notificationRepository;
 
         public OrdersController(
             IOrderRepository orderRepository, 
             IProductRepository productRepository,
-            IRepository<User> userRepository)
+            IRepository<User> userRepository,
+            INotificationRepository notificationRepository)
         {
             _orderRepository = orderRepository;
             _productRepository = productRepository;
             _userRepository = userRepository;
+            _notificationRepository = notificationRepository;
         }
 
         [HttpPost]
@@ -141,5 +144,79 @@ namespace GeekStore.Api.Controllers
             var orders = await _orderRepository.GetOrdersBySellerAsync(sellerId);
             return Ok(orders);
         }
+
+        /// <summary>
+        /// PUT /api/orders/{id}/status
+        /// Allows the seller to advance the order through the status flow:
+        /// Pending → Confirmed → Shipped → Completed
+        /// Auto-creates a notification for the buyer on each transition.
+        /// </summary>
+        [HttpPut("{id}/status")]
+        public async Task<ActionResult> UpdateOrderStatus(int id, [FromBody] UpdateStatusDto dto)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out int sellerId))
+                return Unauthorized();
+
+            var order = await _orderRepository.GetOrderByIdAsync(id);
+            if (order == null)
+                return NotFound("Orden no encontrada.");
+
+            if (order.SellerId != sellerId)
+                return Forbid();
+
+            // Validate status flow
+            var validTransitions = new Dictionary<string, string>
+            {
+                { "Pending", "Confirmed" },
+                { "Confirmed", "Shipped" },
+                { "Shipped", "Completed" }
+            };
+
+            if (!validTransitions.TryGetValue(order.Status, out var expectedNext) || expectedNext != dto.NewStatus)
+                return BadRequest($"No se puede cambiar el estado de '{order.Status}' a '{dto.NewStatus}'. El siguiente estado válido es: '{expectedNext ?? "ninguno (ya finalizada)"}'");
+
+            // Apply the transition
+            order.Status = dto.NewStatus;
+            switch (dto.NewStatus)
+            {
+                case "Confirmed":
+                    order.ConfirmedAt = System.DateTime.UtcNow;
+                    break;
+                case "Shipped":
+                    order.ShippedAt = System.DateTime.UtcNow;
+                    break;
+                case "Completed":
+                    order.CompletedAt = System.DateTime.UtcNow;
+                    break;
+            }
+
+            await _orderRepository.UpdateAsync(order);
+
+            // Create notification for the buyer
+            var seller = await _userRepository.GetByIdAsync(sellerId);
+            var statusLabels = new Dictionary<string, string>
+            {
+                { "Confirmed", "confirmada" },
+                { "Shipped", "enviada" },
+                { "Completed", "completada" }
+            };
+            var label = statusLabels.GetValueOrDefault(dto.NewStatus, dto.NewStatus);
+
+            var notification = new Notification
+            {
+                UserId = order.BuyerId,
+                Title = $"Orden #{order.Id} {label}",
+                Message = $"{seller?.Nickname ?? "El vendedor"} ha marcado tu orden #{order.Id} (₡{order.TotalAmountCRC:N0}) como {label}.",
+                Type = "OrderUpdate",
+                RelatedEntityId = order.Id
+            };
+
+            await _notificationRepository.AddAsync(notification);
+
+            return Ok(new { message = $"Orden actualizada a {dto.NewStatus}", order.Status });
+        }
     }
+
+    public record UpdateStatusDto(string NewStatus);
 }

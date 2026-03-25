@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL Database ──────────────────────────────
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: geekstore-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: geekstore
+      POSTGRES_PASSWORD: geekstore123
+      POSTGRES_DB: geekstore
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # ── Backend (.NET 9 API) ──────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: geekstore-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://+:5242
+      DATABASE_URL: Host=postgres-db;Port=5432;Database=geekstore;Username=geekstore;Password=geekstore123
+    ports:
+      - "5242:5242"
+    depends_on:
+      - postgres-db
+
+  # ── Frontend (React + Vite served by Nginx) ───────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: geekstore-front
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

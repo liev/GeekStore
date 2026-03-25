@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Trash2, Box, Eye, Image as ImageIcon, ArrowUpDown, Pencil, X } from 'lucide-react';
-import { catalogApi, sellersApi, settingsApi, usersApi, type Product, type SellerAnalyticsDto } from '../api/client';
+import { Trash2, Box, Eye, Image as ImageIcon, ArrowUpDown, Pencil, X, Package, CheckCircle, Truck, PackageCheck } from 'lucide-react';
+import { catalogApi, sellersApi, settingsApi, usersApi, ordersApi, type Product, type Order, type SellerAnalyticsDto } from '../api/client';
+import NotificationBell from '../components/NotificationBell';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
@@ -12,7 +13,7 @@ interface JwtPayload {
 }
 
 export default function Dashboard() {
-    const [activeTab, setActiveTab] = useState<'inventory' | 'upload' | 'subscription' | 'profile'>('inventory');
+    const [activeTab, setActiveTab] = useState<'inventory' | 'upload' | 'subscription' | 'profile' | 'orders'>('inventory');
     const [inventory, setInventory] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [metrics, setMetrics] = useState<SellerAnalyticsDto | null>(null);
@@ -57,6 +58,11 @@ export default function Dashboard() {
     const [editStock, setEditStock] = useState<number>(1);
     const [editCatId, setEditCatId] = useState<number>(1);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+    // Orders State
+    const [sellerOrders, setSellerOrders] = useState<Order[]>([]);
+    const [loadingOrders, setLoadingOrders] = useState(false);
+    const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
     
     const openEditModal = (p: Product) => {
         setEditingProduct(p);
@@ -145,6 +151,22 @@ export default function Dashboard() {
 
         fetchInventory();
         fetchMetrics();
+
+        // Fetch orders for orders tab
+        const fetchOrders = async () => {
+            if (activeTab === 'orders' && token) {
+                setLoadingOrders(true);
+                try {
+                    const orders = await ordersApi.getMySales(token);
+                    setSellerOrders(orders);
+                } catch (err) {
+                    console.error('Error fetching seller orders', err);
+                } finally {
+                    setLoadingOrders(false);
+                }
+            }
+        };
+        fetchOrders();
     }, [activeTab, sellerId, token]);
 
     return (
@@ -177,6 +199,7 @@ export default function Dashboard() {
                         >
                             Ver Catálogo
                         </button>
+                        {token && <NotificationBell token={token} />}
                         <button
                             onClick={() => navigate('/admin')}
                             className="w-full md:w-auto bg-neon-pink/10 text-neon-pink font-sans font-medium px-5 py-3 sm:py-2 hover:bg-neon-pink hover:text-white transition-colors rounded-lg border border-neon-pink/50"
@@ -254,6 +277,15 @@ export default function Dashboard() {
                             }`}
                     >
                         Perfil de Vendedor
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('orders')}
+                        className={`px-4 py-3 sm:px-8 sm:py-3 rounded-xl sm:rounded-full transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'orders'
+                            ? 'glass-panel text-white shadow-lg shadow-orange-400/20 border-orange-400'
+                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                            }`}
+                    >
+                        📦 Órdenes Recibidas
                     </button>
                 </div>
 
@@ -701,6 +733,99 @@ export default function Dashboard() {
                                     {isSavingProfile ? 'GUARDANDO...' : 'GUARDAR CONTACTO DE WHATSAPP'}
                                 </button>
                             </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'orders' && (
+                        <div className="relative z-10 w-full overflow-x-auto animate-in fade-in duration-300">
+                            <h2 className="text-xl font-display font-bold text-white mb-6 flex items-center gap-3">
+                                <Package className="text-orange-400" size={24} />
+                                Órdenes Recibidas
+                                <span className="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full font-sans">{sellerOrders.length} total</span>
+                            </h2>
+
+                            {loadingOrders ? (
+                                <div className="py-12 text-center text-orange-400 font-retro animate-pulse">CARGANDO ÓRDENES...</div>
+                            ) : sellerOrders.length === 0 ? (
+                                <div className="py-12 text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl">
+                                    <Package className="mx-auto mb-3 opacity-20" size={48} />
+                                    <p className="font-sans">Aún no has recibido órdenes.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {sellerOrders.map(order => {
+                                        const statusConfig: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ReactNode }> = {
+                                            'Pending': { color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/30', label: 'Pendiente', icon: <Package size={16} /> },
+                                            'Confirmed': { color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/30', label: 'Confirmada', icon: <CheckCircle size={16} /> },
+                                            'Shipped': { color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/30', label: 'Enviada', icon: <Truck size={16} /> },
+                                            'Completed': { color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/30', label: 'Completada', icon: <PackageCheck size={16} /> },
+                                        };
+                                        const sc = statusConfig[order.status] || statusConfig['Pending'];
+
+                                        const nextStatusMap: Record<string, string> = {
+                                            'Pending': 'Confirmed',
+                                            'Confirmed': 'Shipped',
+                                            'Shipped': 'Completed'
+                                        };
+                                        const nextStatus = nextStatusMap[order.status];
+                                        const nextLabel: Record<string, string> = {
+                                            'Confirmed': 'Confirmar',
+                                            'Shipped': 'Marcar Envío',
+                                            'Completed': 'Completar'
+                                        };
+
+                                        return (
+                                            <div key={order.id} className={`bg-slate-900/60 border ${sc.border} rounded-xl p-5 transition-all hover:shadow-lg`}>
+                                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-3 mb-2">
+                                                            <span className="font-retro text-slate-400 text-sm">#{String(order.id).padStart(4, '0')}</span>
+                                                            <span className={`${sc.bg} ${sc.color} ${sc.border} border px-3 py-0.5 rounded-full text-xs font-bold flex items-center gap-1.5`}>
+                                                                {sc.icon} {sc.label}
+                                                            </span>
+                                                            <span className="text-xs text-slate-500 font-sans">{new Date(order.orderDate).toLocaleDateString('es-CR')}</span>
+                                                        </div>
+                                                        <div className="text-sm text-slate-300 font-sans mb-1">
+                                                            <span className="text-slate-500">Comprador:</span>{' '}
+                                                            <span className="font-medium text-white">{order.buyer?.nickname || order.buyer?.name || `ID ${order.buyerId}`}</span>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 mt-2">
+                                                            {order.items.map(item => (
+                                                                <span key={item.id} className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 font-sans">
+                                                                    {item.product?.name || `Producto #${item.productId}`} x{item.quantity}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-2">
+                                                        <span className="text-lg font-display font-bold text-neon-blue">₡{order.totalAmountCRC.toLocaleString('es-CR')}</span>
+                                                        {nextStatus && (
+                                                            <button
+                                                                disabled={updatingOrderId === order.id}
+                                                                onClick={async () => {
+                                                                    if (!token || !nextStatus) return;
+                                                                    setUpdatingOrderId(order.id);
+                                                                    try {
+                                                                        await ordersApi.updateStatus(order.id, nextStatus, token);
+                                                                        setSellerOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: nextStatus } : o));
+                                                                    } catch (err) {
+                                                                        alert(err instanceof Error ? err.message : 'Error al actualizar estado');
+                                                                    } finally {
+                                                                        setUpdatingOrderId(null);
+                                                                    }
+                                                                }}
+                                                                className="px-4 py-2 rounded-lg text-sm font-bold bg-orange-500/20 text-orange-400 hover:bg-orange-500 hover:text-white border border-orange-500/50 transition-all flex items-center gap-2 disabled:opacity-50"
+                                                            >
+                                                                {updatingOrderId === order.id ? 'Actualizando...' : `→ ${nextLabel[nextStatus]}`}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 

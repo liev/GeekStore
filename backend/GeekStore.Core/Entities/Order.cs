@@ -17,10 +17,15 @@ namespace GeekStore.Core.Entities
         
         public decimal TotalAmountCRC { get; set; }
         
-        // "Pending", "Paid", "Shipped", "Completed", "Cancelled"
+        // "Pending", "Confirmed", "Shipped", "Completed", "Cancelled"
         public string Status { get; set; } = "Pending";
         
         public DateTime OrderDate { get; set; } = DateTime.UtcNow;
+        
+        // Status transition timestamps for order timeline
+        public DateTime? ConfirmedAt { get; set; }
+        public DateTime? ShippedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
         
         // P2P / WhatsApp contact info at time of order
         public string? BuyerPhone { get; set; }

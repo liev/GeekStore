@@ -435,12 +435,15 @@ export interface OrderItem {
 export interface Order {
     id: number;
     buyerId: number;
-    buyer?: { id: number; name: string; email: string };
+    buyer?: { id: number; name: string; nickname: string; email: string };
     sellerId: number;
     seller?: Seller;
     totalAmountCRC: number;
     status: string;
     orderDate: string;
+    confirmedAt?: string;
+    shippedAt?: string;
+    completedAt?: string;
     deliveryMethod: string;
     deliveryPointId?: number;
     deliveryPoint?: { id: number; name: string; address: string };
@@ -483,6 +486,22 @@ export const ordersApi = {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) throw new Error('Failed to fetch sales');
+        return await res.json();
+    },
+    /** Update order status (seller only). */
+    updateStatus: async (orderId: number, newStatus: string, token: string): Promise<{ message: string; status: string }> => {
+        const res = await fetchApi(`${API_BASE_URL}/Orders/${orderId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ newStatus })
+        });
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err || 'Error al actualizar estado');
+        }
         return await res.json();
     }
 };
@@ -562,5 +581,124 @@ export const usersApi = {
         if (!res.ok) throw new Error('Failed to update profile');
         const data = await res.json();
         return data.message;
+    }
+};
+
+// ── Reviews & Ratings ──────────────────────────────────────────────────
+
+export interface Review {
+    id: number;
+    rating: number;
+    comment: string;
+    createdAt: string;
+    updatedAt?: string;
+    reviewerNickname: string;
+    reviewerId: number;
+}
+
+export interface ReviewSummary {
+    averageRating: number;
+    reviewCount: number;
+}
+
+export interface CreateReviewDto {
+    sellerId: number;
+    rating: number;
+    comment: string;
+}
+
+export const reviewsApi = {
+    /** Create or update a review for a seller. */
+    createReview: async (data: CreateReviewDto, token: string): Promise<{ message: string }> => {
+        const res = await fetchApi(`${API_BASE_URL}/Reviews`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err || 'Error al crear reseña');
+        }
+        return await res.json();
+    },
+
+    /** Get all reviews for a seller. */
+    getSellerReviews: async (sellerId: number): Promise<Review[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Reviews/seller/${sellerId}`);
+            if (!res.ok) return [];
+            return await res.json();
+        } catch {
+            return [];
+        }
+    },
+
+    /** Get average rating and count for a seller. */
+    getSellerSummary: async (sellerId: number): Promise<ReviewSummary> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Reviews/seller/${sellerId}/summary`);
+            if (!res.ok) return { averageRating: 0, reviewCount: 0 };
+            return await res.json();
+        } catch {
+            return { averageRating: 0, reviewCount: 0 };
+        }
+    }
+};
+
+// ── Notifications ───────────────────────────────────────────────────
+
+export interface AppNotification {
+    id: number;
+    userId: number;
+    title: string;
+    message: string;
+    type: string;
+    isRead: boolean;
+    relatedEntityId?: number;
+    createdAt: string;
+}
+
+export const notificationsApi = {
+    /** Get all notifications for the authenticated user. */
+    getAll: async (token: string): Promise<AppNotification[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Notifications`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch {
+            return [];
+        }
+    },
+    /** Get unread notification count for badge. */
+    getUnreadCount: async (token: string): Promise<number> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Notifications/unread-count`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return 0;
+            const data = await res.json();
+            return data.count;
+        } catch {
+            return 0;
+        }
+    },
+    /** Mark a single notification as read. */
+    markRead: async (id: number, token: string): Promise<void> => {
+        await fetchApi(`${API_BASE_URL}/Notifications/${id}/read`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+    /** Mark all notifications as read. */
+    markAllRead: async (token: string): Promise<void> => {
+        await fetchApi(`${API_BASE_URL}/Notifications/read-all`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
     }
 };

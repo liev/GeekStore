@@ -262,6 +262,7 @@ export default function Login() {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
+                                    autoComplete="email"
                                     className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-blue rounded-lg text-white p-3.5 font-sans outline-none transition-colors shadow-inner"
                                     placeholder="vendedor@sistema.com"
                                 />
@@ -274,6 +275,7 @@ export default function Login() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
+                                    autoComplete="current-password"
                                     className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-3.5 font-sans outline-none transition-colors shadow-inner"
                                     placeholder="••••••••"
                                 />
@@ -408,6 +410,7 @@ export default function Login() {
                                     value={regEmail}
                                     onChange={(e) => setRegEmail(e.target.value)}
                                     required
+                                    autoComplete="email"
                                     className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner"
                                 />
                             </div>
@@ -419,6 +422,7 @@ export default function Login() {
                                     value={regPassword}
                                     onChange={(e) => setRegPassword(e.target.value)}
                                     required
+                                    autoComplete="new-password"
                                     className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner"
                                 />
                             </div>
