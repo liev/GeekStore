@@ -80,6 +80,9 @@ builder.Services.AddHttpClient<GeminiVisionService>();
 builder.Services.AddHttpClient<GeminiSellerAnalysisService>();
 builder.Services.AddHttpClient<MoxfieldService>();
 
+// Background Workers
+builder.Services.AddHostedService<GeekStore.Api.Services.SubscriptionWorker>();
+
 var app = builder.Build();
 
 // Auto-create/migrate the database on startup (dev convenience)

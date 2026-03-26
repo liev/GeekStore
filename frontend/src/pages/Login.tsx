@@ -125,7 +125,8 @@ export default function Login() {
                     Surname: regSurname,
                     Nickname: regNickname,
                     Email: regEmail,
-                    Password: regPassword
+                    Password: regPassword,
+                    Role: regRole
                 });
                 if (success) {
                     setVerifyEmail(regEmail);
@@ -148,7 +149,8 @@ export default function Login() {
                 Surname: regSurname,
                 Nickname: regNickname,
                 Email: regEmail,
-                Password: regPassword
+                Password: regPassword,
+                Role: regRole
             });
 
             if (success) {

@@ -253,6 +253,9 @@ export interface User {
     role: string;
     isActive: boolean;
     createdAt: string;
+    subscriptionPlan?: string;
+    subscriptionEndDate?: string | null;
+    autoRenew?: boolean;
 }
 
 export const adminApi = {
@@ -285,6 +288,55 @@ export const adminApi = {
         } catch (error) {
             console.error(error);
             return null;
+        }
+    },
+    grantPlan: async (id: number, plan: string, endDate: string | null, token: string): Promise<User | null> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/users/${id}/grant-plan`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ plan, endDate })
+            });
+            if (!res.ok) throw new Error(`Failed to grant plan for user ${id}`);
+            return await res.json();
+        } catch (error) {
+            console.error(error);
+            return null;
+        }
+    },
+    moderateProduct: async (productId: number, reason: string, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/products/${productId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ reason })
+            });
+            return res.ok;
+        } catch (error) {
+            console.error(error);
+            return false;
+        }
+    },
+    sendWarning: async (userId: number, reason: string, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/users/${userId}/warn`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ reason })
+            });
+            return res.ok;
+        } catch (error) {
+            console.error(error);
+            return false;
         }
     }
 };
@@ -345,7 +397,7 @@ export const settingsApi = {
     },
     updateSellerFee: async (newFee: string, token: string): Promise<string> => {
         try {
-            const res = await fetchApi(`${API_BASE_URL}/Settings/seller-fee`, {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/settings/fees`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -534,6 +586,13 @@ export interface UserProfileDto {
 }
 
 export const usersApi = {
+    getMe: async (token: string): Promise<UserProfileDto> => {
+        const res = await fetchApi(`${API_BASE_URL}/Users/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch current user');
+        return await res.json();
+    },
     getProfile: async (id: number, token?: string): Promise<UserProfileDto> => {
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -556,16 +615,27 @@ export const usersApi = {
         });
         if (!res.ok) throw new Error('Failed to unfollow user');
     },
-    paySubscription: async (orderId: string, token: string): Promise<string> => {
-        const res = await fetchApi(`${API_BASE_URL}/Users/pay-subscription`, {
+    upgradeToSeller: async (plan: string, orderId: string, token: string): Promise<string> => {
+        const res = await fetchApi(`${API_BASE_URL}/Users/upgrade-to-seller`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ orderId })
+            body: JSON.stringify({ plan, orderId })
         });
-        if (!res.ok) throw new Error('Failed to validate subscription');
+        if (!res.ok) throw new Error('Failed to upgrade to seller');
+        const data = await res.json();
+        return data.message;
+    },
+    cancelSubscription: async (token: string): Promise<string> => {
+        const res = await fetchApi(`${API_BASE_URL}/Users/cancel-subscription`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (!res.ok) throw new Error('Failed to cancel subscription');
         const data = await res.json();
         return data.message;
     },

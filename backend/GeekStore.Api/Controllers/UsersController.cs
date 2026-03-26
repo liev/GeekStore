@@ -9,9 +9,10 @@ using System.Threading.Tasks;
 
 namespace GeekStore.Api.Controllers
 {
-    public class PaySubscriptionDto
+    public class UpgradeToSellerDto
     {
         public string OrderId { get; set; } = string.Empty;
+        public string Plan { get; set; } = "Licencia Mercante";
     }
 
     public class UpdateProfileDto
@@ -35,6 +36,31 @@ namespace GeekStore.Api.Controllers
             _userRepository = userRepository;
             _userFollowRepository = userFollowRepository;
             _productRepository = productRepository;
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetMe()
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out int userId)) return Unauthorized();
+
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null) return NotFound("User not found.");
+
+            return Ok(new
+            {
+                user.Id,
+                user.Name,
+                user.Surname,
+                user.Nickname,
+                user.Email,
+                user.Role,
+                user.IsActive,
+                user.SubscriptionPlan,
+                user.SubscriptionEndDate,
+                user.AutoRenew
+            });
         }
 
         [HttpGet("{id}/profile")]
@@ -108,9 +134,9 @@ namespace GeekStore.Api.Controllers
             return Ok(new { message = "Successfully unfollowed user." });
         }
 
-        [HttpPost("pay-subscription")]
+        [HttpPost("upgrade-to-seller")]
         [Authorize]
-        public async Task<IActionResult> PaySubscription([FromBody] PaySubscriptionDto request)
+        public async Task<IActionResult> UpgradeToSeller([FromBody] UpgradeToSellerDto request)
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!int.TryParse(userIdStr, out int userId)) return Unauthorized();
@@ -118,12 +144,33 @@ namespace GeekStore.Api.Controllers
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) return NotFound("User not found.");
 
-            // Verification of PayPal orderId would happen here.
-            // For MVP, we presume success if it reached this endpoint.
-            user.IsActive = true;
+            // PayPal verification would happen here. Assumed successful for MVP.
+            user.Role = "Seller";
+            user.SubscriptionPlan = request.Plan;
+            user.SubscriptionEndDate = System.DateTime.UtcNow.AddDays(30);
+            user.AutoRenew = true;
+            user.IsActive = true; 
+
             await _userRepository.UpdateAsync(user);
 
-            return Ok(new { message = "Suscripción validada. Eres un vendedor verificado/activo." });
+            return Ok(new { message = "¡Felicidades! Ahora tienes Licencia de Vendedor." });
+        }
+
+        [HttpPost("cancel-subscription")]
+        [Authorize]
+        public async Task<IActionResult> CancelSubscription()
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out int userId)) return Unauthorized();
+
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null) return NotFound("User not found.");
+
+            user.AutoRenew = false;
+            
+            await _userRepository.UpdateAsync(user);
+
+            return Ok(new { message = "Alerta: Tu auto-renovación ha sido cancelada. Tu plan actual se mantendrá hasta su fecha de vencimiento." });
         }
 
         [HttpPut("profile")]

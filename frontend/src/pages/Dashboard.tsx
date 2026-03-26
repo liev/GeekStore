@@ -25,6 +25,12 @@ export default function Dashboard() {
     const [token, setToken] = useState<string | null>(null);
     const [sellerFee, setSellerFee] = useState<string>('0');
     const [subFeeUSD, setSubFeeUSD] = useState<string>('10.00');
+
+    // Subscription & Role State
+    const [userRole, setUserRole] = useState<string>('Buyer');
+    const [subPlan, setSubPlan] = useState<string>('Ninguno');
+    const [subEndDate, setSubEndDate] = useState<string | null>(null);
+    const [subAutoRenew, setSubAutoRenew] = useState<boolean>(false);
     
     // Profile State
     const [sellerPhone, setSellerPhone] = useState<string>('');
@@ -130,8 +136,21 @@ export default function Dashboard() {
         const fetchMetrics = async () => {
             if (sellerId !== null && token) {
                 try {
-                    const data = await sellersApi.getMetrics(token);
-                    setMetrics(data);
+                    const me = await usersApi.getMe(token);
+                    setUserRole(me.role);
+                    setSubPlan(me.subscriptionPlan || 'Ninguno');
+                    setSubEndDate(me.subscriptionEndDate || null);
+                    setSubAutoRenew(me.autoRenew || false);
+
+                    if (me.role === 'Buyer' && activeTab === 'inventory') {
+                        setActiveTab('subscription');
+                    }
+
+                    if (me.role === 'Seller') {
+                        const data = await sellersApi.getMetrics(token);
+                        setMetrics(data);
+                    }
+
                     const fee = await settingsApi.getSellerFee();
                     setSellerFee(fee);
                     // Conversion to USD (approx 500 CRC to 1 USD)
@@ -242,24 +261,28 @@ export default function Dashboard() {
 
                 {/* Dashboard Nav */}
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 font-sans font-medium text-base sm:text-lg">
-                    <button
-                        onClick={() => setActiveTab('inventory')}
-                        className={`px-4 py-3 sm:px-8 sm:py-3 rounded-xl sm:rounded-full transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'inventory'
-                            ? 'glass-panel text-white shadow-lg shadow-neon-blue/20 border-neon-blue'
-                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
-                            }`}
-                    >
-                        Inventario
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('upload')}
-                        className={`px-4 py-3 sm:px-8 sm:py-3 rounded-xl sm:rounded-full transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'upload'
-                            ? 'glass-panel text-white shadow-lg shadow-neon-pink/20 border-neon-pink'
-                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
-                            }`}
-                    >
-                        Agregar Cinta de Datos
-                    </button>
+                    {userRole === 'Seller' && (
+                        <>
+                            <button
+                                onClick={() => setActiveTab('inventory')}
+                                className={`px-4 py-3 sm:px-8 sm:py-3 rounded-xl sm:rounded-full transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'inventory'
+                                    ? 'glass-panel text-white shadow-lg shadow-neon-blue/20 border-neon-blue'
+                                    : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                                    }`}
+                            >
+                                Inventario
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('upload')}
+                                className={`px-4 py-3 sm:px-8 sm:py-3 rounded-xl sm:rounded-full transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'upload'
+                                    ? 'glass-panel text-white shadow-lg shadow-neon-pink/20 border-neon-pink'
+                                    : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                                    }`}
+                            >
+                                Agregar Cinta de Datos
+                            </button>
+                        </>
+                    )}
                     <button
                         onClick={() => setActiveTab('subscription')}
                         className={`px-4 py-3 sm:px-8 sm:py-3 rounded-xl sm:rounded-full transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'subscription'
@@ -278,15 +301,17 @@ export default function Dashboard() {
                     >
                         Perfil de Vendedor
                     </button>
-                    <button
-                        onClick={() => setActiveTab('orders')}
-                        className={`px-4 py-3 sm:px-8 sm:py-3 rounded-xl sm:rounded-full transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'orders'
-                            ? 'glass-panel text-white shadow-lg shadow-orange-400/20 border-orange-400'
-                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
-                            }`}
-                    >
-                        📦 Órdenes Recibidas
-                    </button>
+                    {userRole === 'Seller' && (
+                        <button
+                            onClick={() => setActiveTab('orders')}
+                            className={`px-4 py-3 sm:px-8 sm:py-3 rounded-xl sm:rounded-full transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'orders'
+                                ? 'glass-panel text-white shadow-lg shadow-orange-400/20 border-orange-400'
+                                : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                                }`}
+                        >
+                            📦 Órdenes Recibidas
+                        </button>
+                    )}
                 </div>
 
                 {/* System Display Panel */}
@@ -647,48 +672,97 @@ export default function Dashboard() {
                     {activeTab === 'subscription' && (
                         <div className="relative z-10 w-full max-w-2xl mx-auto space-y-8 animate-in fade-in flex flex-col items-center">
                             <div className="text-center mb-6">
-                                <h2 className="text-3xl font-display font-bold text-yellow-400 drop-shadow-[0_0_12px_rgba(250,204,21,0.6)] mb-2">Cuota de Vendedor (Suscripción)</h2>
-                                <p className="text-slate-300 font-sans text-lg">Mantén tu tienda activa en GeekStore y tu perfil visible para los compradores P2P.</p>
+                                <h2 className="text-3xl font-display font-bold text-yellow-400 drop-shadow-[0_0_12px_rgba(250,204,21,0.6)] mb-2">Licencia de Gremio</h2>
+                                <p className="text-slate-300 font-sans text-lg">Controla tu contrato mercantil y acceso al Marketplace principal.</p>
                             </div>
 
                             <div className="glass-panel p-8 rounded-2xl border border-yellow-400/50 relative overflow-hidden shadow-[0_0_30px_rgba(250,204,21,0.15)] w-full text-center">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/20 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-                                <h3 className="text-xl font-display text-white mb-2">Renovación Mensual</h3>
-                                <p className="text-4xl font-black text-neon-blue drop-shadow-[0_0_10px_rgba(0,240,255,0.6)] mb-6">₡{parseFloat(sellerFee).toLocaleString('es-CR')}</p>
-                                <p className="text-sm font-retro text-slate-400 tracking-wider mb-8">~ ${subFeeUSD} USD</p>
                                 
-                                <div className="space-y-4 max-w-sm mx-auto z-20 relative">
-                                    <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", currency: "USD", intent: "capture" }}>
-                                        <PayPalButtons 
-                                            style={{ layout: "vertical", shape: "pill", color: "gold" }}
-                                            createOrder={(_data, actions) => {
-                                                return actions.order.create({
-                                                    intent: "CAPTURE",
-                                                    purchase_units: [
-                                                        {
-                                                            description: "Suscripción Mensual GeekStore",
-                                                            amount: { value: subFeeUSD, currency_code: "USD" }
+                                {userRole === 'Seller' ? (
+                                    <>
+                                        <h3 className="text-2xl font-display text-white mb-2">Estado: <span className="text-emerald-400">ACTIVO</span></h3>
+                                        <p className="text-slate-300 text-sm font-sans mb-4">Plan Actual: <span className="text-neon-pink font-bold">{subPlan}</span></p>
+                                        <p className="text-slate-300 text-sm font-sans mb-6">Vigente hasta: <span className="text-white font-bold">{subEndDate ? new Date(subEndDate).toLocaleDateString('es-CR') : 'Indefinido'}</span></p>
+                                        
+                                        {subAutoRenew ? (
+                                            <div className="space-y-4 max-w-sm mx-auto z-20 relative">
+                                                <p className="text-emerald-400 text-xs font-bold uppercase mb-2 animate-pulse">↻ Renovación Automática Activada</p>
+                                                <button 
+                                                    onClick={async () => {
+                                                        try {
+                                                            const msg = await usersApi.cancelSubscription(token!);
+                                                            alert(msg);
+                                                            setSubAutoRenew(false);
+                                                        } catch (err) {
+                                                            alert(err instanceof Error ? err.message : 'Error al cancelar la renovación.');
                                                         }
-                                                    ],
-                                                });
-                                            }}
-                                            onApprove={async (_data, actions) => {
-                                                if (!actions.order) return;
-                                                const order = await actions.order.capture();
-                                                try {
-                                                    await usersApi.paySubscription(order.id || '', token!);
-                                                    alert("¡Pago exitoso! Tu suscripción P2P ha sido renovada. Eres un vendedor verificado de GeekStore.");
-                                                } catch (err) {
-                                                    alert(err instanceof Error ? err.message : "Hubo un error al validar la suscripción.");
-                                                }
-                                            }}
-                                            onError={(err) => {
-                                                console.error("PayPal Error:", err);
-                                                alert("Ocurrió un error con el procesador de pagos.");
-                                            }}
-                                        />
-                                    </PayPalScriptProvider>
-                                </div>
+                                                    }}
+                                                    className="w-full bg-red-500/10 text-red-500 border border-red-500/50 font-sans font-bold py-3 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-lg"
+                                                >
+                                                    ROMPER CONTRATO (CANCELAR RENOVACIÓN)
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4 max-w-sm mx-auto z-20 relative">
+                                                <p className="text-slate-400 text-xs font-bold uppercase mb-2">Renovación automática pausada. Adquiere o renueva ahora.</p>
+                                                <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", currency: "USD", intent: "capture" }}>
+                                                    <PayPalButtons 
+                                                        style={{ layout: "vertical", shape: "pill", color: "gold" }}
+                                                        createOrder={(_data, actions) => {
+                                                            return actions.order.create({
+                                                                intent: "CAPTURE",
+                                                                purchase_units: [{ description: "Renovación Licencia Mercante", amount: { value: subFeeUSD, currency_code: "USD" } }],
+                                                            });
+                                                        }}
+                                                        onApprove={async (_data, actions) => {
+                                                            if (!actions.order) return;
+                                                            const order = await actions.order.capture();
+                                                            try {
+                                                                await usersApi.upgradeToSeller('Licencia Mercante', order.id || '', token!);
+                                                                alert("Suscripción renovada exitosamente.");
+                                                                window.location.reload();
+                                                            } catch (err) {
+                                                                alert("Error renovando la suscripción.");
+                                                            }
+                                                        }}
+                                                    />
+                                                </PayPalScriptProvider>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <h3 className="text-xl font-display text-white mb-2">Adquirir Licencia Mercante</h3>
+                                        <p className="text-4xl font-black text-neon-blue drop-shadow-[0_0_10px_rgba(0,240,255,0.6)] mb-6">₡{parseFloat(sellerFee).toLocaleString('es-CR')}<span className="text-sm">/mes</span></p>
+                                        <p className="text-sm font-retro text-slate-400 tracking-wider mb-8">~ ${subFeeUSD} USD</p>
+                                        
+                                        <div className="space-y-4 max-w-sm mx-auto z-20 relative">
+                                            <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", currency: "USD", intent: "capture" }}>
+                                                <PayPalButtons 
+                                                    style={{ layout: "vertical", shape: "pill", color: "gold" }}
+                                                    createOrder={(_data, actions) => {
+                                                        return actions.order.create({
+                                                            intent: "CAPTURE",
+                                                            purchase_units: [{ description: "Suscripción Mensual GeekStore", amount: { value: subFeeUSD, currency_code: "USD" } }],
+                                                        });
+                                                    }}
+                                                    onApprove={async (_data, actions) => {
+                                                        if (!actions.order) return;
+                                                        const order = await actions.order.capture();
+                                                        try {
+                                                            await usersApi.upgradeToSeller('Licencia Mercante', order.id || '', token!);
+                                                            alert("¡Felicidades! Has sido ascendido a Goblin Mercader en GeekStore.");
+                                                            window.location.reload();
+                                                        } catch (err) {
+                                                            alert("Error procesando pago y ascenso.");
+                                                        }
+                                                    }}
+                                                />
+                                            </PayPalScriptProvider>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}

@@ -24,7 +24,7 @@ namespace GeekStore.Api.Controllers
         }
 
         public record LoginDto(string Email, string Password);
-        public record RegisterDto(string Name, string Surname, string Nickname, string Email, string Password);
+        public record RegisterDto(string Name, string Surname, string Nickname, string Email, string Password, string? Role);
         public record VerifyDto(string Email, string Code);
 
         [HttpPost("login")]
@@ -58,7 +58,7 @@ namespace GeekStore.Api.Controllers
                 Surname = dto.Surname,
                 Nickname = dto.Nickname,
                 Email = dto.Email,
-                Role = "Seller",
+                Role = dto.Role ?? "Buyer",
                 IsVerified = false,
                 VerificationCode = code,
                 VerificationCodeExpiry = DateTime.UtcNow.AddMinutes(15)

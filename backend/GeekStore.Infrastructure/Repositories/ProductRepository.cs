@@ -29,7 +29,7 @@ namespace GeekStore.Infrastructure.Repositories
             return await _dbContext.Products
                 .Include(p => p.Seller)
                 .Include(p => p.PreferredDeliveryPoint)
-                .Where(p => p.StockStatus == "Available" && p.Seller != null && p.Seller.IsActive)
+                .Where(p => p.StockStatus == "Available" && p.Seller != null && p.Seller.IsActive && p.IsActive)
                 .ToListAsync();
         }
 
@@ -39,7 +39,7 @@ namespace GeekStore.Infrastructure.Repositories
                 .Include(p => p.Seller)
                 .Include(p => p.PreferredDeliveryPoint)
                 .Include(p => p.CategoryEntity)
-                .Where(p => p.StockStatus == "Available" && p.Seller != null && p.Seller.IsActive)
+                .Where(p => p.StockStatus == "Available" && p.Seller != null && p.Seller.IsActive && p.IsActive)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(query.Search))
@@ -94,7 +94,7 @@ namespace GeekStore.Infrastructure.Repositories
                 .Include(p => p.Seller)
                 .Include(p => p.PreferredDeliveryPoint)
                 .Include(p => p.CategoryEntity)
-                .Where(p => p.StockStatus == "Available" && p.StockCount > 0 && p.Seller != null && p.Seller.IsActive)
+                .Where(p => p.StockStatus == "Available" && p.StockCount > 0 && p.Seller != null && p.Seller.IsActive && p.IsActive)
                 .Where(p => sellerIds.Contains(p.SellerId));
 
             var totalCount = await queryable.CountAsync();

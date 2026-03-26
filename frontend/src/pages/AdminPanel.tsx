@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShieldAlert, ShieldCheck, ArrowUpDown, Save, Layers, Plus, ChevronDown, ChevronRight, BarChart3, BrainCircuit, TrendingUp, Info } from 'lucide-react';
-import { adminApi, settingsApi, categoriesApi, adminDashboardApi, type User, type Category } from '../api/client';
+import { adminApi, settingsApi, categoriesApi, adminDashboardApi, catalogApi, type User, type Category, type Product } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 
@@ -26,7 +26,7 @@ export default function AdminPanel() {
     const [isUpdatingFee, setIsUpdatingFee] = useState(false);
 
     // Categories State
-    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard' | 'productos'>('dashboard');
     const [categories, setCategories] = useState<Category[]>([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
@@ -46,6 +46,29 @@ export default function AdminPanel() {
 
     // Subcategory State
     const [isAddingSubcategory, setIsAddingSubcategory] = useState<{ [key: number]: boolean }>({});
+
+    // Catalog Moderation State
+    const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+    const [loadingCatalog, setLoadingCatalog] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+    const fetchCatalog = async () => {
+        setLoadingCatalog(true);
+        try {
+            const res = await catalogApi.getProducts({ page: 1, pageSize: 200 });
+            setCatalogProducts(res.items);
+        } catch(e) {
+            console.error(e);
+        } finally {
+            setLoadingCatalog(false);
+        }
+    };
+    
+    useEffect(() => {
+        if (activeTab === 'productos' && catalogProducts.length === 0) {
+            fetchCatalog();
+        }
+    }, [activeTab]);
 
     useEffect(() => {
         const fetchFee = async () => {
@@ -129,6 +152,29 @@ export default function AdminPanel() {
             }
         } catch (error) {
             console.error("Error toggling ban status", error);
+        }
+    };
+
+    const handleGrantPlan = async (userId: number) => {
+        if (!token) return;
+        const plan = prompt("Nombre del Plan (ej. Licencia Mercante, Licencia Épica):", "Licencia Mercante");
+        if (!plan) return;
+        
+        const days = prompt("Días de validez (deja en blanco para indefinido):", "30");
+        let endDate: string | null = null;
+        if (days && !isNaN(Number(days))) {
+            const date = new Date();
+            date.setDate(date.getDate() + Number(days));
+            endDate = date.toISOString();
+        }
+        
+        try {
+            const updated = await adminApi.grantPlan(userId, plan, endDate, token);
+            if (updated) {
+                setUsers(users.map(u => u.id === userId ? updated : u));
+            }
+        } catch (e) {
+            alert("Error al asignar plan");
         }
     };
 
@@ -311,6 +357,15 @@ export default function AdminPanel() {
                             }`}
                     >
                         Categorías
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('productos')}
+                        className={`px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'productos'
+                            ? 'glass-panel text-white shadow-lg shadow-purple-500/20 border-purple-500'
+                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                            }`}
+                    >
+                        Catálogo
                     </button>
                 </div>
 
@@ -514,22 +569,33 @@ export default function AdminPanel() {
                                                     <span className="bg-slate-800 text-neon-blue px-3 py-1 rounded-full text-xs font-medium border border-slate-700">{user.role}</span>
                                                 </td>
                                                 <td className="p-4 text-center">
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${user.isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
-                                                        {user.isActive ? 'ACTIVO' : 'BANEADO'}
-                                                    </span>
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${user.isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                                                            {user.isActive ? 'ACTIVO' : 'BANEADO'}
+                                                        </span>
+                                                        {user.role === 'Seller' && user.subscriptionPlan && (
+                                                            <span className="text-[10px] text-neon-pink mt-1">{user.subscriptionPlan}</span>
+                                                        )}
+                                                    </div>
                                                 </td>
-                                                <td className="p-4 text-right">
+                                                <td className="p-4 text-right flex flex-col gap-2 items-end">
                                                     <button
                                                         onClick={() => handleToggleBan(user.id)}
-                                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${user.isActive
+                                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all w-32 ${user.isActive
                                                             ? 'bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/50'
                                                             : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/50'}`}
                                                     >
                                                         {user.isActive ? (
-                                                            <span className="flex items-center gap-2"><ShieldAlert size={16} /> BANEAR</span>
+                                                            <span className="flex items-center justify-center gap-2"><ShieldAlert size={14} /> BANEAR</span>
                                                         ) : (
-                                                            <span className="flex items-center gap-2"><ShieldCheck size={16} /> REACTIVAR</span>
+                                                            <span className="flex items-center justify-center gap-2"><ShieldCheck size={14} /> REACTIVAR</span>
                                                         )}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleGrantPlan(user.id)}
+                                                        className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all w-32 bg-yellow-400/20 text-yellow-400 hover:bg-yellow-400 hover:text-slate-900 border border-yellow-400/50 flex items-center justify-center gap-2"
+                                                    >
+                                                        {user.role === 'Seller' ? 'EDITAR PLAN' : 'ASIGNAR PLAN'}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -540,6 +606,44 @@ export default function AdminPanel() {
                             <div className="mt-8 text-center text-slate-500 font-retro text-sm opacity-50">
                             // MODO ADMINISTRADOR //
                             </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'productos' && (
+                        <div className="relative z-10 w-full overflow-x-auto animate-in fade-in duration-300">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-slate-700 text-slate-400 font-sans text-sm tracking-widest uppercase">
+                                        <th className="p-4 font-semibold text-slate-300">ID</th>
+                                        <th className="p-4 font-semibold text-slate-300">Producto</th>
+                                        <th className="p-4 font-semibold text-slate-300">Vendedor</th>
+                                        <th className="p-4 font-semibold text-slate-300 text-right">Inquisición</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loadingCatalog ? (
+                                         <tr><td colSpan={4} className="p-8 text-center text-purple-400 font-retro animate-pulse">CARGANDO CATÁLOGO...</td></tr>
+                                    ) : catalogProducts.length === 0 ? (
+                                         <tr><td colSpan={4} className="p-8 text-center text-slate-500 font-sans">No hay productos activos en el catálogo.</td></tr>
+                                    ) : (
+                                        catalogProducts.map(p => (
+                                            <tr key={p.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors group">
+                                                <td className="p-4 font-retro text-slate-400 text-sm">{String(p.id).padStart(3, '0')}</td>
+                                                <td className="p-4 text-white font-bold">{p.name}</td>
+                                                <td className="p-4 text-slate-400">{p.seller?.nickname || p.seller?.name || `ID ${p.sellerId}`}</td>
+                                                <td className="p-4 text-right">
+                                                    <button 
+                                                        onClick={() => setSelectedProduct(p)}
+                                                        className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/50"
+                                                    >
+                                                        INSPECCIONAR
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     )}
 
@@ -595,6 +699,156 @@ export default function AdminPanel() {
                     )}
                 </div>
             </div>
+
+            {/* Catalog Moderation Modal */}
+            {selectedProduct && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+                            <h3 className="text-xl font-display font-bold text-white flex items-center gap-2">
+                                <ShieldAlert className="text-neon-pink" size={24} />
+                                Inspección de Artículo
+                            </h3>
+                            <button onClick={() => setSelectedProduct(null)} className="text-slate-400 hover:text-white transition-colors">
+                                ✖
+                            </button>
+                        </div>
+                        
+                        <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">
+                            <div className="flex flex-col md:flex-row gap-6">
+                                {/* Image */}
+                                <div className="w-full md:w-1/3">
+                                    <div className="aspect-square rounded-xl overflow-hidden bg-slate-800 border border-slate-700">
+                                        <img src={selectedProduct.imageUrl} alt={selectedProduct.name} className="w-full h-full object-cover" />
+                                    </div>
+                                    {selectedProduct.imageUrl2 && (
+                                        <div className="flex gap-2 mt-2">
+                                            <img src={selectedProduct.imageUrl2} alt="Vista 2" className="w-16 h-16 rounded-lg object-cover border border-slate-700" />
+                                            {selectedProduct.imageUrl3 && <img src={selectedProduct.imageUrl3} alt="Vista 3" className="w-16 h-16 rounded-lg object-cover border border-slate-700" />}
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Details */}
+                                <div className="w-full md:w-2/3 space-y-4">
+                                    <div>
+                                        <h4 className="text-xs font-retro text-slate-500 uppercase tracking-widest mb-1">Nombre del Producto</h4>
+                                        <p className="text-xl font-bold text-white">{selectedProduct.name}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-slate-800/40 p-3 rounded-lg border border-slate-700/50">
+                                            <span className="block text-[10px] text-slate-500 font-retro uppercase mb-1">Precio</span>
+                                            <span className="text-neon-blue font-bold">₡{selectedProduct.priceCRC.toLocaleString('es-CR')}</span>
+                                        </div>
+                                        <div className="bg-slate-800/40 p-3 rounded-lg border border-slate-700/50">
+                                            <span className="block text-[10px] text-slate-500 font-retro uppercase mb-1">Vendedor</span>
+                                            <span className="text-slate-200 font-medium font-sans">{selectedProduct.seller?.nickname || selectedProduct.seller?.name || `ID ${selectedProduct.sellerId}`}</span>
+                                        </div>
+                                        <div className="bg-slate-800/40 p-3 rounded-lg border border-slate-700/50">
+                                            <span className="block text-[10px] text-slate-500 font-retro uppercase mb-1">Condición</span>
+                                            <span className="text-slate-200 font-medium font-sans">{selectedProduct.condition || 'N/A'}</span>
+                                        </div>
+                                        <div className="bg-slate-800/40 p-3 rounded-lg border border-slate-700/50">
+                                            <span className="block text-[10px] text-slate-500 font-retro uppercase mb-1">Stock</span>
+                                            <span className="text-slate-200 font-medium font-sans">{selectedProduct.stockCount} ({selectedProduct.stockStatus})</span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-xs font-retro text-slate-500 uppercase tracking-widest mb-1 mt-2">Descripción Completa</h4>
+                                        <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700">
+                                            <p className="text-sm text-slate-300 font-sans leading-relaxed whitespace-pre-wrap">{selectedProduct.description}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    {selectedProduct.isMoxfieldCollection && selectedProduct.moxfieldDeckUrl && (
+                                        <div className="bg-purple-900/20 border border-purple-500/30 p-3 rounded-lg flex items-center justify-between">
+                                            <div>
+                                                <span className="block text-[10px] text-purple-400 font-retro uppercase mb-1">Moxfield Link</span>
+                                                <a href={selectedProduct.moxfieldDeckUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-purple-300 hover:text-white hover:underline truncate inline-block max-w-[200px]">
+                                                    {selectedProduct.moxfieldDeckUrl}
+                                                </a>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Actions Footer */}
+                        <div className="p-4 border-t border-slate-800 bg-slate-900 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <button 
+                                onClick={async () => {
+                                    if (!token) return;
+                                    const reason = prompt("Motivo de la moderación (Inquisición Goblin):", "Incumplimiento de normas de publicación");
+                                    if (!reason) return;
+                                    try {
+                                        const success = await adminApi.moderateProduct(selectedProduct.id, reason, token);
+                                        if(success) {
+                                            setCatalogProducts(catalogProducts.filter(cp => cp.id !== selectedProduct.id));
+                                            setSelectedProduct(null);
+                                            alert("Producto censurado. Notificación enviada al vendedor.");
+                                        } else {
+                                            alert("Error en la solicitud.");
+                                        }
+                                    } catch(e) {
+                                        alert("Error de censura");
+                                    }
+                                }}
+                                className="w-full px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/50 flex flex-col items-center gap-1 group"
+                            >
+                                <span className="uppercase tracking-widest font-retro text-[10px]">Censurar</span>
+                                <span className="text-xs font-sans group-hover:text-white/80 line-clamp-1">Borrar Producto</span>
+                            </button>
+                            
+                            <button 
+                                onClick={async () => {
+                                    if (!token) return;
+                                    const reason = prompt("Mensaje de Advertencia al vendedor:", "Advertencia: Por favor revisa la descripción y condición de tus artículos.");
+                                    if (!reason) return;
+                                    try {
+                                        const success = await adminApi.sendWarning(selectedProduct.sellerId, reason, token);
+                                        if(success) {
+                                            alert("Se ha enviado la advertencia al Vendedor.");
+                                        } else {
+                                            alert("No se pudo enviar la advertencia.");
+                                        }
+                                    } catch(e) {
+                                        alert("Error al advertir");
+                                    }
+                                }}
+                                className="w-full px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-slate-900 border border-yellow-500/50 flex flex-col items-center gap-1 group"
+                            >
+                                <span className="uppercase tracking-widest font-retro text-[10px]">Advertencia</span>
+                                <span className="text-xs font-sans group-hover:text-slate-800/80 line-clamp-1">Notificar Falta</span>
+                            </button>
+                            
+                            <button 
+                                onClick={async () => {
+                                    if (!token) return;
+                                    if (confirm(`¿Estás seguro que deseas bloquear al vendedor ID ${selectedProduct.sellerId}? Esto desactivará todos sus productos automáticamente.`)) {
+                                        try {
+                                            const updatedUser = await adminApi.toggleBan(selectedProduct.sellerId, token);
+                                            if(updatedUser && !updatedUser.isActive) {
+                                                setCatalogProducts(catalogProducts.filter(cp => cp.sellerId !== selectedProduct.sellerId));
+                                                setUsers(users.map(u => u.id === selectedProduct.sellerId ? { ...u, isActive: false } : u));
+                                                setSelectedProduct(null);
+                                                alert("Vendedor expulsado y catálogo purgado.");
+                                            }
+                                        } catch(e) {
+                                            alert("Error al bloquear vendedor.");
+                                        }
+                                    }
+                                }}
+                                className="w-full px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-purple-500/10 text-purple-400 hover:bg-purple-500 hover:text-white border border-purple-500/50 flex flex-col items-center gap-1 group"
+                            >
+                                <span className="uppercase tracking-widest font-retro text-[10px]">Excomunión</span>
+                                <span className="text-xs font-sans group-hover:text-white/80 line-clamp-1">Banear Vendedor</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

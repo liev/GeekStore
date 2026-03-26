@@ -59,7 +59,10 @@ namespace GeekStore.Api.Controllers
                 Role = "Seller",
                 IsActive = true,
                 IsVerified = true,
-                PhoneNumber = "+50687654321"
+                PhoneNumber = "+50687654321",
+                SubscriptionPlan = "Licencia Mercante",
+                SubscriptionEndDate = System.DateTime.UtcNow.AddDays(30),
+                AutoRenew = true
             };
 
             var seller2 = new User
@@ -69,10 +72,12 @@ namespace GeekStore.Api.Controllers
                 Nickname = "MagicQueen",
                 Email = "maria@test.com",
                 PasswordHash = "test123",
-                Role = "Seller",
                 IsActive = true,
                 IsVerified = true,
-                PhoneNumber = "+50611223344"
+                PhoneNumber = "+50611223344",
+                SubscriptionPlan = "Licencia de Prueba",
+                SubscriptionEndDate = System.DateTime.UtcNow.AddMinutes(-1), // Expired! Worker should catch this
+                AutoRenew = false
             };
 
             var buyer = new User

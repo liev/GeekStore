@@ -29,6 +29,9 @@ namespace GeekStore.Core.Entities
         // "Available", "Sold", "Suspended"
         public string StockStatus { get; set; } = "Available";
         
+        // Soft delete or hide from catalog when subscription ends/admin moderation
+        public bool IsActive { get; set; } = true;
+
         [ConcurrencyCheck]
         public int StockCount { get; set; } = 1;
 

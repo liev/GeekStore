@@ -29,6 +29,11 @@ namespace GeekStore.Core.Entities
         public decimal? MonthlyFee { get; set; }
         public string? Benefits { get; set; }
 
+        // Subscription Engine
+        public string? SubscriptionPlan { get; set; } // e.g. "Licencia Mercante", "Contrato Goblin"
+        public DateTime? SubscriptionEndDate { get; set; }
+        public bool AutoRenew { get; set; } = false;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }
