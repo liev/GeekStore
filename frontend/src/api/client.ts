@@ -323,21 +323,32 @@ export const adminApi = {
             return false;
         }
     },
-    sendWarning: async (userId: number, reason: string, token: string): Promise<boolean> => {
-        try {
-            const res = await fetchApi(`${API_BASE_URL}/Admin/users/${userId}/warn`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ reason })
-            });
-            return res.ok;
-        } catch (error) {
-            console.error(error);
-            return false;
-        }
+    sendWarning: async (userId: number, reason: string, token: string): Promise<string> => {
+        const res = await fetchApi(`${API_BASE_URL}/Admin/users/${userId}/warn`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ reason })
+        });
+        if (!res.ok) throw new Error('Failed to send warning');
+        const data = await res.json();
+        return data.message;
+    },
+    getReviews: async (token: string): Promise<(Review & { sellerId: number; sellerNickname: string })[]> => {
+        const res = await fetchApi(`${API_BASE_URL}/Admin/reviews`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch reviews');
+        return await res.json();
+    },
+    deleteReview: async (id: number, token: string): Promise<void> => {
+        const res = await fetchApi(`${API_BASE_URL}/Admin/reviews/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to delete review');
     }
 };
 
@@ -370,7 +381,7 @@ export const adminDashboardApi = {
         try {
             const res = await fetchApi(`${API_BASE_URL}/AdminDashboard/update-seller-config/${id}`, {
                 method: 'PUT',
-                headers: { 
+                headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
@@ -514,7 +525,7 @@ export const ordersApi = {
     createOrder: async (data: CreateOrderDto, token: string): Promise<{ message: string; orderCount: number; sellers: OrderSellerInfo[] }> => {
         const res = await fetchApi(`${API_BASE_URL}/Orders`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
@@ -618,7 +629,7 @@ export const usersApi = {
     upgradeToSeller: async (plan: string, orderId: string, token: string): Promise<string> => {
         const res = await fetchApi(`${API_BASE_URL}/Users/upgrade-to-seller`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
@@ -631,7 +642,7 @@ export const usersApi = {
     cancelSubscription: async (token: string): Promise<string> => {
         const res = await fetchApi(`${API_BASE_URL}/Users/cancel-subscription`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${token}`
             }
         });
@@ -642,7 +653,7 @@ export const usersApi = {
     updateProfile: async (payload: { phoneNumber?: string }, token: string): Promise<string> => {
         const res = await fetchApi(`${API_BASE_URL}/Users/profile`, {
             method: 'PUT',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },

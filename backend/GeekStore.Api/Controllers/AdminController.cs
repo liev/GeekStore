@@ -164,5 +164,38 @@ namespace GeekStore.Api.Controllers
             await _context.SaveChangesAsync();
             return Ok(new { message = "Product soft-deleted and seller notified." });
         }
+
+        [HttpGet("reviews")]
+        public async Task<IActionResult> GetAllReviews()
+        {
+            var reviews = await _context.Reviews
+                .Include(r => r.Seller)
+                .Include(r => r.Reviewer)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new {
+                    id = r.Id,
+                    rating = r.Rating,
+                    comment = r.Comment,
+                    createdAt = r.CreatedAt,
+                    sellerId = r.SellerId,
+                    sellerNickname = r.Seller!.Nickname,
+                    reviewerId = r.ReviewerId,
+                    reviewerNickname = r.Reviewer!.Nickname
+                })
+                .ToListAsync();
+
+            return Ok(reviews);
+        }
+
+        [HttpDelete("reviews/{id}")]
+        public async Task<IActionResult> DeleteReview(int id)
+        {
+            var review = await _context.Reviews.FindAsync(id);
+            if (review == null) return NotFound();
+
+            _context.Reviews.Remove(review);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
     }
 }

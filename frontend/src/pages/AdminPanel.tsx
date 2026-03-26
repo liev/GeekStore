@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ShieldAlert, ShieldCheck, ArrowUpDown, Save, Layers, Plus, ChevronDown, ChevronRight, BarChart3, BrainCircuit, TrendingUp, Info } from 'lucide-react';
-import { adminApi, settingsApi, categoriesApi, adminDashboardApi, catalogApi, type User, type Category, type Product } from '../api/client';
+import { ShieldAlert, ShieldCheck, ArrowUpDown, Save, Layers, Plus, ChevronDown, ChevronRight, BarChart3, BrainCircuit, TrendingUp, Info, Search, Filter, X } from 'lucide-react';
+import { adminApi, settingsApi, categoriesApi, adminDashboardApi, catalogApi, reviewsApi, type User, type Category, type Product, type ReviewSummary, type Review } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 
@@ -26,7 +26,7 @@ export default function AdminPanel() {
     const [isUpdatingFee, setIsUpdatingFee] = useState(false);
 
     // Categories State
-    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard' | 'productos'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard' | 'productos' | 'reseñas'>('dashboard');
     const [categories, setCategories] = useState<Category[]>([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
@@ -51,12 +51,60 @@ export default function AdminPanel() {
     const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
     const [loadingCatalog, setLoadingCatalog] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [catalogSearch, setCatalogSearch] = useState('');
+    const [catalogCondition, setCatalogCondition] = useState('All');
+    const [catalogStock, setCatalogStock] = useState('All');
+    const [sellerRatings, setSellerRatings] = useState<Record<number, ReviewSummary>>({});
+
+    // Admin Reviews State
+    const [adminReviews, setAdminReviews] = useState<(Review & { sellerId: number; sellerNickname: string })[]>([]);
+    const [loadingReviews, setLoadingReviews] = useState(false);
+
+    const fetchAdminReviews = async () => {
+        if (!token) return;
+        setLoadingReviews(true);
+        try {
+            const data = await adminApi.getReviews(token);
+            setAdminReviews(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingReviews(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'reseñas' && adminReviews.length === 0) {
+            fetchAdminReviews();
+        }
+    }, [activeTab, token]);
+
+    const handleDeleteReview = async (id: number) => {
+        if (!token) return;
+        if (!window.confirm('¿Confiscar esta reseña permanentemente bajo cargos de herejía?')) return;
+        try {
+            await adminApi.deleteReview(id, token);
+            setAdminReviews(prev => prev.filter(r => r.id !== id));
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     const fetchCatalog = async () => {
         setLoadingCatalog(true);
         try {
             const res = await catalogApi.getProducts({ page: 1, pageSize: 200 });
             setCatalogProducts(res.items);
+            
+            const uniqueSellerIds = Array.from(new Set(res.items.map(p => p.sellerId).filter(id => id)));
+            const ratingsMap: Record<number, ReviewSummary> = {};
+            await Promise.all(uniqueSellerIds.map(async (id) => {
+                try {
+                    const sum = await reviewsApi.getSellerSummary(id);
+                    if (sum) ratingsMap[id] = sum;
+                } catch { } // Ignore errors for individual fetch
+            }));
+            setSellerRatings(ratingsMap);
         } catch(e) {
             console.error(e);
         } finally {
@@ -101,8 +149,10 @@ export default function AdminPanel() {
     const sortedUsers = [...users].sort((a, b) => {
         const aVal = a[sortColumn];
         const bVal = b[sortColumn];
-        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+        if (aVal === undefined || aVal === null) return sortDirection === 'asc' ? 1 : -1;
+        if (bVal === undefined || bVal === null) return sortDirection === 'asc' ? -1 : 1;
+        if (aVal! < bVal!) return sortDirection === 'asc' ? -1 : 1;
+        if (aVal! > bVal!) return sortDirection === 'asc' ? 1 : -1;
         return 0;
     });
 
@@ -277,6 +327,17 @@ export default function AdminPanel() {
         }
     };
 
+    const filteredCatalog = catalogProducts.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(catalogSearch.toLowerCase()) || 
+                              (p.seller?.nickname || p.seller?.name || `id ${p.sellerId}`).toLowerCase().includes(catalogSearch.toLowerCase());
+        const matchesCondition = catalogCondition === 'All' || p.condition === catalogCondition;
+        let matchesStock = true;
+        if (catalogStock === 'Available') matchesStock = p.stockStatus === 'Available' && p.stockCount > 0;
+        if (catalogStock === 'OutOfStock') matchesStock = p.stockStatus === 'OutOfStock' || p.stockCount === 0;
+        
+        return matchesSearch && matchesCondition && matchesStock;
+    });
+
     return (
         <div className="min-h-screen p-4 sm:p-8 relative flex flex-col">
             <div className="z-10 relative max-w-6xl mx-auto w-full">
@@ -366,6 +427,15 @@ export default function AdminPanel() {
                             }`}
                     >
                         Catálogo
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('reseñas')}
+                        className={`px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'reseñas'
+                            ? 'glass-panel text-white shadow-lg shadow-yellow-500/20 border-yellow-500'
+                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                            }`}
+                    >
+                        Reseñas
                     </button>
                 </div>
 
@@ -610,33 +680,140 @@ export default function AdminPanel() {
                     )}
 
                     {activeTab === 'productos' && (
+                        <div className="relative z-10 w-full animate-in fade-in duration-300 space-y-4">
+                            {/* Toolbar (Search & Filters) */}
+                            <div className="flex flex-col md:flex-row gap-4 justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                                <div className="flex-1 relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar producto o vendedor..." 
+                                        value={catalogSearch}
+                                        onChange={e => setCatalogSearch(e.target.value)}
+                                        className="w-full bg-slate-900 border border-slate-700 focus:border-neon-blue rounded-lg text-white py-2.5 pl-10 pr-4 font-sans outline-none transition-colors"
+                                    />
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="relative">
+                                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                        <select 
+                                            value={catalogCondition}
+                                            onChange={e => setCatalogCondition(e.target.value)}
+                                            className="appearance-none bg-slate-900 border border-slate-700 focus:border-neon-blue rounded-lg text-white py-2.5 pl-9 pr-8 font-sans outline-none transition-colors"
+                                        >
+                                            <option value="All">Cualquier Condición</option>
+                                            <option value="NM">NM (Near Mint)</option>
+                                            <option value="LP">LP (Lightly Played)</option>
+                                            <option value="MP">MP (Moderately Played)</option>
+                                            <option value="HP">HP (Heavily Played)</option>
+                                            <option value="PO">PO (Poor)</option>
+                                            <option value="N/A">N/A</option>
+                                        </select>
+                                    </div>
+                                    <div className="relative">
+                                        <Layers className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                        <select 
+                                            value={catalogStock}
+                                            onChange={e => setCatalogStock(e.target.value)}
+                                            className="appearance-none bg-slate-900 border border-slate-700 focus:border-neon-blue rounded-lg text-white py-2.5 pl-9 pr-8 font-sans outline-none transition-colors"
+                                        >
+                                            <option value="All">Cualquier Stock</option>
+                                            <option value="Available">En Stock</option>
+                                            <option value="OutOfStock">Agotados</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-700 text-slate-400 font-sans text-sm tracking-widest uppercase">
+                                            <th className="p-4 font-semibold text-slate-300">ID</th>
+                                            <th className="p-4 font-semibold text-slate-300">Producto</th>
+                                            <th className="p-4 font-semibold text-slate-300">Vendedor</th>
+                                            <th className="p-4 font-semibold text-slate-300 text-center">Rating</th>
+                                            <th className="p-4 font-semibold text-slate-300 text-center">Stock</th>
+                                            <th className="p-4 font-semibold text-slate-300 text-right">Inquisición</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {loadingCatalog ? (
+                                             <tr><td colSpan={6} className="p-8 text-center text-purple-400 font-retro animate-pulse">CARGANDO CATÁLOGO...</td></tr>
+                                        ) : filteredCatalog.length === 0 ? (
+                                             <tr><td colSpan={6} className="p-8 text-center text-slate-500 font-sans">No se encontraron productos que coincidan.</td></tr>
+                                        ) : (
+                                            filteredCatalog.map(p => (
+                                                <tr key={p.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors group">
+                                                    <td className="p-4 font-retro text-slate-400 text-sm">{String(p.id).padStart(3, '0')}</td>
+                                                    <td className="p-4 text-white font-bold">{p.name}</td>
+                                                    <td className="p-4 text-slate-400">{p.seller?.nickname || p.seller?.name || `ID ${p.sellerId}`}</td>
+                                                    <td className="p-4 text-center">
+                                                        {sellerRatings[p.sellerId] && sellerRatings[p.sellerId].reviewCount > 0 ? (
+                                                            <div className="flex items-center justify-center gap-1 text-yellow-500">
+                                                                <span className="font-bold text-sm">{sellerRatings[p.sellerId].averageRating.toFixed(1)}</span>
+                                                                <span className="text-xs text-slate-500">({sellerRatings[p.sellerId].reviewCount})</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-600 font-retro uppercase tracking-widest">N/A</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4 text-center">
+                                                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${p.stockStatus === 'Available' && p.stockCount > 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+                                                            {p.stockCount} {p.stockStatus === 'Available' && p.stockCount > 0 ? 'DISP' : 'AGOT'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-right">
+                                                        <button 
+                                                            onClick={() => setSelectedProduct(p)}
+                                                            className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/50"
+                                                        >
+                                                            INSPECCIONAR
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'reseñas' && (
                         <div className="relative z-10 w-full overflow-x-auto animate-in fade-in duration-300">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-slate-700 text-slate-400 font-sans text-sm tracking-widest uppercase">
                                         <th className="p-4 font-semibold text-slate-300">ID</th>
-                                        <th className="p-4 font-semibold text-slate-300">Producto</th>
+                                        <th className="p-4 font-semibold text-slate-300">Comprador (Autor)</th>
                                         <th className="p-4 font-semibold text-slate-300">Vendedor</th>
+                                        <th className="p-4 font-semibold text-slate-300 text-center">Rating</th>
+                                        <th className="p-4 font-semibold text-slate-300 w-1/3">Comentario</th>
                                         <th className="p-4 font-semibold text-slate-300 text-right">Inquisición</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {loadingCatalog ? (
-                                         <tr><td colSpan={4} className="p-8 text-center text-purple-400 font-retro animate-pulse">CARGANDO CATÁLOGO...</td></tr>
-                                    ) : catalogProducts.length === 0 ? (
-                                         <tr><td colSpan={4} className="p-8 text-center text-slate-500 font-sans">No hay productos activos en el catálogo.</td></tr>
+                                    {loadingReviews ? (
+                                         <tr><td colSpan={6} className="p-8 text-center text-yellow-500 font-retro animate-pulse">CARGANDO REGISTROS DE HEREJÍA...</td></tr>
+                                    ) : adminReviews.length === 0 ? (
+                                         <tr><td colSpan={6} className="p-8 text-center text-slate-500 font-sans">No hay reseñas registradas en el reino.</td></tr>
                                     ) : (
-                                        catalogProducts.map(p => (
-                                            <tr key={p.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors group">
-                                                <td className="p-4 font-retro text-slate-400 text-sm">{String(p.id).padStart(3, '0')}</td>
-                                                <td className="p-4 text-white font-bold">{p.name}</td>
-                                                <td className="p-4 text-slate-400">{p.seller?.nickname || p.seller?.name || `ID ${p.sellerId}`}</td>
+                                        adminReviews.map(r => (
+                                            <tr key={r.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors group">
+                                                <td className="p-4 font-retro text-slate-400 text-sm">{String(r.id).padStart(3, '0')}</td>
+                                                <td className="p-4 text-white font-bold">{r.reviewerNickname || `User ${r.reviewerId}`}</td>
+                                                <td className="p-4 text-slate-400">{r.sellerNickname || `Seller ${r.sellerId}`}</td>
+                                                <td className="p-4 text-center">
+                                                    <span className="text-yellow-500 font-bold">{r.rating} ⭐</span>
+                                                </td>
+                                                <td className="p-4 text-slate-400 text-sm italic">"{r.comment}"</td>
                                                 <td className="p-4 text-right">
                                                     <button 
-                                                        onClick={() => setSelectedProduct(p)}
-                                                        className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/50"
+                                                        onClick={() => handleDeleteReview(r.id)}
+                                                        className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/50"
                                                     >
-                                                        INSPECCIONAR
+                                                        CENSURAR
                                                     </button>
                                                 </td>
                                             </tr>
@@ -849,6 +1026,89 @@ export default function AdminPanel() {
                     </div>
                 </div>
             )}
+
+            {/* Seller Customization Modal */}
+            {editingSellerId !== null && (
+                <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[60] flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg shadow-2xl shadow-neon-blue/20 flex flex-col relative overflow-hidden">
+                        {/* Glow effect */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-1 bg-gradient-to-r from-transparent via-neon-blue to-transparent blur-sm"></div>
+                        
+                        <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                            <div>
+                                <h2 className="text-2xl font-display font-bold text-white flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-neon-blue/10 flex items-center justify-center border border-neon-blue/30">
+                                        <Save className="text-neon-blue" size={20} />
+                                    </div>
+                                    Ajustes de Vendedor
+                                </h2>
+                                <p className="text-xs text-slate-500 mt-1 font-sans">ID Interno: {editingSellerId}</p>
+                            </div>
+                            <button onClick={() => setEditingSellerId(null)} className="text-slate-500 hover:text-white transition-colors p-2 hover:bg-slate-800 rounded-full">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-8 space-y-6">
+                            <div className="space-y-2">
+                                <label className="block text-slate-400 font-sans font-bold text-xs uppercase tracking-widest">Cuota Mensual Personalizada (CRC)</label>
+                                <div className="relative group">
+                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                        <span className="text-neon-blue font-bold">₡</span>
+                                    </div>
+                                    <input 
+                                        type="number" 
+                                        value={editMonthlyFee} 
+                                        onChange={(e) => setEditMonthlyFee(Number(e.target.value))} 
+                                        className="w-full bg-slate-950 border border-slate-700 focus:border-neon-blue rounded-xl text-white p-4 pl-10 font-retro outline-none transition-all shadow-inner"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-slate-600 font-sans italic">Si se deja en 0 o vacío, se usará la cuota global del sistema.</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-slate-400 font-sans font-bold text-xs uppercase tracking-widest">Beneficios y Ventajas del Seller</label>
+                                <textarea 
+                                    rows={4} 
+                                    value={editBenefits} 
+                                    onChange={(e) => setEditBenefits(e.target.value)} 
+                                    className="w-full bg-slate-950 border border-slate-700 focus:border-neon-blue rounded-xl text-white p-4 font-sans outline-none resize-none transition-all shadow-inner"
+                                    placeholder="ej. Misión prioritaria en catálogo, Comisiones 0% en TCG, Soporte 24/7..."
+                                ></textarea>
+                                <p className="text-[10px] text-slate-600 font-sans italic">Estos beneficios pueden ser visibles para el vendedor en su portal.</p>
+                            </div>
+                        </div>
+                        
+                        <div className="p-8 border-t border-slate-800 bg-slate-900/80 flex flex-col sm:flex-row gap-3">
+                            <button 
+                                onClick={() => setEditingSellerId(null)} 
+                                className="flex-1 py-4 rounded-xl font-heading font-bold text-slate-500 hover:text-white hover:bg-slate-800 transition-all border border-transparent hover:border-slate-700"
+                            >
+                                CANCELAR
+                            </button>
+                            <button 
+                                disabled={isSavingSeller}
+                                onClick={handleSaveSellerConfig} 
+                                className="flex-[2] py-4 rounded-xl font-heading font-bold bg-gradient-to-r from-neon-blue to-cyan-600 text-slate-900 hover:from-cyan-400 hover:to-neon-blue transition-all shadow-xl shadow-neon-blue/20 group"
+                            >
+                                <span className="flex items-center justify-center gap-2">
+                                    {isSavingSeller ? (
+                                        <>
+                                            <div className="w-5 h-5 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin"></div>
+                                            GUARDANDO...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save size={18} /> APLICAR CAMBIOS
+                                        </>
+                                    )}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -996,92 +1256,9 @@ function CategoryTreeItem({
                     )}
                 </div>
             </div>
-
-            {/* Seller Customization Modal */}
-            {editingSellerId !== null && (
-                <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[60] flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg shadow-2xl shadow-neon-blue/20 flex flex-col relative overflow-hidden">
-                        {/* Glow effect */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-1 bg-gradient-to-r from-transparent via-neon-blue to-transparent blur-sm"></div>
-                        
-                        <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                            <div>
-                                <h2 className="text-2xl font-display font-bold text-white flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-neon-blue/10 flex items-center justify-center border border-neon-blue/30">
-                                        <Save className="text-neon-blue" size={20} />
-                                    </div>
-                                    Ajustes de Vendedor
-                                </h2>
-                                <p className="text-xs text-slate-500 mt-1 font-sans">ID Interno: {editingSellerId}</p>
-                            </div>
-                            <button onClick={() => setEditingSellerId(null)} className="text-slate-500 hover:text-white transition-colors p-2 hover:bg-slate-800 rounded-full">
-                                <X size={24} />
-                            </button>
-                        </div>
-                        
-                        <div className="p-8 space-y-6">
-                            <div className="space-y-2">
-                                <label className="block text-slate-400 font-sans font-bold text-xs uppercase tracking-widest">Cuota Mensual Personalizada (CRC)</label>
-                                <div className="relative group">
-                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                        <span className="text-neon-blue font-bold">₡</span>
-                                    </div>
-                                    <input 
-                                        type="number" 
-                                        value={editMonthlyFee} 
-                                        onChange={(e) => setEditMonthlyFee(Number(e.target.value))} 
-                                        className="w-full bg-slate-950 border border-slate-700 focus:border-neon-blue rounded-xl text-white p-4 pl-10 font-retro outline-none transition-all shadow-inner"
-                                        placeholder="0"
-                                    />
-                                </div>
-                                <p className="text-[10px] text-slate-600 font-sans italic">Si se deja en 0 o vacío, se usará la cuota global del sistema.</p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="block text-slate-400 font-sans font-bold text-xs uppercase tracking-widest">Beneficios y Ventajas del Seller</label>
-                                <textarea 
-                                    rows={4} 
-                                    value={editBenefits} 
-                                    onChange={(e) => setEditBenefits(e.target.value)} 
-                                    className="w-full bg-slate-950 border border-slate-700 focus:border-neon-blue rounded-xl text-white p-4 font-sans outline-none resize-none transition-all shadow-inner"
-                                    placeholder="ej. Misión prioritaria en catálogo, Comisiones 0% en TCG, Soporte 24/7..."
-                                ></textarea>
-                                <p className="text-[10px] text-slate-600 font-sans italic">Estos beneficios pueden ser visibles para el vendedor en su portal.</p>
-                            </div>
-                        </div>
-                        
-                        <div className="p-8 border-t border-slate-800 bg-slate-900/80 flex flex-col sm:flex-row gap-3">
-                            <button 
-                                onClick={() => setEditingSellerId(null)} 
-                                className="flex-1 py-4 rounded-xl font-heading font-bold text-slate-500 hover:text-white hover:bg-slate-800 transition-all border border-transparent hover:border-slate-700"
-                            >
-                                CANCELAR
-                            </button>
-                            <button 
-                                disabled={isSavingSeller}
-                                onClick={handleSaveSellerConfig} 
-                                className="flex-[2] py-4 rounded-xl font-heading font-bold bg-gradient-to-r from-neon-blue to-cyan-600 text-slate-900 hover:from-cyan-400 hover:to-neon-blue transition-all shadow-xl shadow-neon-blue/20 group"
-                            >
-                                <span className="flex items-center justify-center gap-2">
-                                    {isSavingSeller ? (
-                                        <>
-                                            <div className="w-5 h-5 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin"></div>
-                                            GUARDANDO...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save size={18} /> APLICAR CAMBIOS
-                                        </>
-                                    )}
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
 
-// Subcomponent functions ... (rest of CategoryTreeItem)
+// Subcomponent functions
 
