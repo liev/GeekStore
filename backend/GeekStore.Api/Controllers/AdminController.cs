@@ -12,8 +12,7 @@ namespace GeekStore.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    // [Authorize(Roles = "Admin")] // Kept simplified for now, as asked
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public class AdminController : ControllerBase
     {
         private readonly GeekStoreDbContext _context;
@@ -26,10 +25,14 @@ namespace GeekStore.Api.Controllers
         }
 
         [HttpGet("users")]
-        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        public async Task<ActionResult<IEnumerable<object>>> GetUsers()
         {
             var users = await _context.Users.OrderByDescending(u => u.Id).ToListAsync();
-            return Ok(users);
+            return Ok(users.Select(u => new {
+                u.Id, u.Name, u.Surname, u.Nickname, u.Email, u.Role,
+                u.IsActive, u.SubscriptionPlan, u.SubscriptionEndDate, u.AutoRenew,
+                u.PhoneNumber, u.CreatedAt
+            }));
         }
 
         [HttpPut("users/{id}/toggle-ban")]
@@ -156,8 +159,8 @@ namespace GeekStore.Api.Controllers
             await _notificationRepo.AddAsync(new Notification
             {
                 UserId = product.SellerId,
-                Title = "Reporte de Inquisición",
-                Message = $"Tu artículo '{product.Name}' ha sido confiscado del mercado. Razón: {request.Reason}",
+                Title = "Reporte de Moderación",
+                Message = $"Tu artículo '{product.Name}' ha sido eliminado por moderación. Razón: {request.Reason}",
                 Type = "Alert"
             });
 
@@ -196,6 +199,82 @@ namespace GeekStore.Api.Controllers
             _context.Reviews.Remove(review);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        [HttpGet("disputes")]
+        public async Task<IActionResult> GetAllDisputes()
+        {
+            var disputes = await _context.Disputes
+                .Include(d => d.Order)
+                .Include(d => d.InitiatorUser)
+                .Include(d => d.TargetUser)
+                .OrderByDescending(d => d.CreatedAt)
+                .Select(d => new {
+                    id = d.Id,
+                    orderId = d.OrderId,
+                    initiator = new { id = d.InitiatorUser!.Id, name = d.InitiatorUser.Nickname ?? d.InitiatorUser.Name },
+                    target = new { id = d.TargetUser!.Id, name = d.TargetUser.Nickname ?? d.TargetUser.Name },
+                    reason = d.Reason,
+                    status = d.Status,
+                    createdAt = d.CreatedAt,
+                    adminResolution = d.AdminResolution,
+                    orderTotal = d.Order!.TotalAmountCRC
+                })
+                .ToListAsync();
+
+            return Ok(disputes);
+        }
+
+        public class ResolveDisputeRequest
+        {
+            public string Resolution { get; set; } = string.Empty;
+        }
+
+        [HttpPut("disputes/{id}/resolve")]
+        public async Task<IActionResult> ResolveDispute(int id, [FromBody] ResolveDisputeRequest request)
+        {
+            var dispute = await _context.Disputes.FindAsync(id);
+            if (dispute == null) return NotFound();
+
+            dispute.Status = "Resolved";
+            dispute.AdminResolution = request.Resolution;
+
+            await _notificationRepo.AddAsync(new Notification
+            {
+                UserId = dispute.InitiatorUserId,
+                Title = "Resolución de Disputa P2P",
+                Message = $"La disputa que iniciaste por la orden #{dispute.OrderId} recibió un fallo administrativo: {request.Resolution}",
+                Type = "Alert"
+            });
+
+            await _notificationRepo.AddAsync(new Notification
+            {
+                UserId = dispute.TargetUserId,
+                Title = "Resolución de Disputa P2P",
+                Message = $"Una disputa en la que figurabas como contraparte por la orden #{dispute.OrderId} recibió fallo del gremio: {request.Resolution}",
+                Type = "Alert"
+            });
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Disputa resuelta y usuarios notificados." });
+        }
+
+        [HttpDelete("users/{id}")]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
+
+            // Permanent closure (Soft delete logic same as DeleteMe but administrative)
+            user.IsActive = false;
+            user.SubscriptionPlan = "Permanently Closed";
+            user.AutoRenew = false;
+            
+            var products = await _context.Products.Where(p => p.SellerId == id).ToListAsync();
+            foreach (var p in products) p.IsActive = false;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Usuario cerrado permanentemente por la administración." });
         }
     }
 }

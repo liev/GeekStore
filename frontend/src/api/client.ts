@@ -36,6 +36,7 @@ export interface Product {
     stockCount: number;
     createdAt?: string;
     condition?: string;
+    sellerNote?: string;
 }
 
 export interface MoxfieldImportRequest {
@@ -165,6 +166,14 @@ export const catalogApi = {
         }
     },
 
+    deleteProduct: async (id: number, token: string): Promise<void> => {
+        const res = await fetchApi(`${API_BASE_URL}/Products/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('No se pudo eliminar el producto');
+    },
+
     uploadImage: async (file: File, token: string): Promise<{ url: string; message: string; reason: string }> => {
         try {
             const formData = new FormData();
@@ -221,10 +230,19 @@ export const authApi = {
                 body: JSON.stringify({ email, password })
             });
 
-            if (!res.ok) return null;
+            if (!res.ok) {
+                const errData = await res.json().catch(() => null);
+                if (errData?.message === 'EMAIL_NOT_VERIFIED') {
+                    throw new Error('EMAIL_NOT_VERIFIED');
+                }
+                return null;
+            }
             const data = await res.json();
             return data.token;
         } catch (error) {
+            if (error instanceof Error && error.message === 'EMAIL_NOT_VERIFIED') {
+                throw error;
+            }
             console.error(error);
             return null;
         }
@@ -240,6 +258,31 @@ export const authApi = {
         } catch (error) {
             console.error(error);
             return false;
+        }
+    },
+    verifyEmail: async (email: string, code: string): Promise<{ ok: boolean; message?: string }> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Auth/verify-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, code })
+            });
+            const data = await res.json().catch(() => ({}));
+            return { ok: res.ok, message: data.message };
+        } catch {
+            return { ok: false, message: 'Error de conexión' };
+        }
+    },
+    resendCode: async (email: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Auth/resend-code`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            return res.ok;
+        } catch (error) {
+            throw error;
         }
     }
 };
@@ -349,6 +392,18 @@ export const adminApi = {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) throw new Error('Failed to delete review');
+    },
+    deleteUser: async (id: number, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/users/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            return res.ok;
+        } catch (e) {
+            console.error(e);
+            return false;
+        }
     }
 };
 
@@ -362,7 +417,7 @@ export const adminDashboardApi = {
             return await res.json();
         } catch (error) {
             console.error(error);
-            return { sellers: [], totalProducts: 0, totalCartAdditions: 0 };
+            return null;
         }
     },
     getAIAnalysis: async (token: string): Promise<any> => {
@@ -395,6 +450,16 @@ export const adminDashboardApi = {
     }
 };
 
+export interface SubscriptionPlan {
+    name: string;
+    emoji: string;
+    crcPrice: number;
+    usdPrice: number;
+    maxProducts: number | null;
+    isFounder?: boolean;
+    founderSlotsLeft?: number | null;
+}
+
 export const settingsApi = {
     getSellerFee: async (): Promise<string> => {
         try {
@@ -405,6 +470,33 @@ export const settingsApi = {
             console.error(error);
             return "1.00";
         }
+    },
+    getPayPalClientId: async (): Promise<string> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Settings/paypal-client-id`);
+            if (!res.ok) return 'test';
+            const data = await res.json();
+            return data.clientId || 'test';
+        } catch {
+            return 'test';
+        }
+    },
+    getPlans: async (): Promise<SubscriptionPlan[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Settings/plans`);
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    },
+    updatePlanPrice: async (planName: string, crcPrice: number, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Settings/plans/${encodeURIComponent(planName)}/price`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ crcPrice })
+            });
+            return res.ok;
+        } catch { return false; }
     },
     updateSellerFee: async (newFee: string, token: string): Promise<string> => {
         try {
@@ -470,6 +562,53 @@ export const categoriesApi = {
             console.error(error);
             return null;
         }
+    }
+};
+
+export interface DeliveryPoint {
+    id: number;
+    name: string;
+    description: string;
+    locationUrl: string;
+    isActive: boolean;
+}
+
+export const deliveryPointsApi = {
+    getAll: async (): Promise<DeliveryPoint[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/DeliveryPoints`);
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    },
+    create: async (data: Omit<DeliveryPoint, 'id'>, token: string): Promise<DeliveryPoint | null> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/DeliveryPoints`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(data)
+            });
+            return res.ok ? await res.json() : null;
+        } catch { return null; }
+    },
+    update: async (id: number, data: Partial<DeliveryPoint>, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/DeliveryPoints/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(data)
+            });
+            return res.ok;
+        } catch { return false; }
+    },
+    deactivate: async (id: number, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/DeliveryPoints/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            return res.ok;
+        } catch { return false; }
     }
 };
 
@@ -591,9 +730,13 @@ export interface UserProfileDto {
     id: number;
     nickname: string;
     email: string;
+    role: string;
     totalActiveProducts: number;
     isFollowing: boolean;
     phoneNumber?: string;
+    subscriptionPlan?: string;
+    subscriptionEndDate?: string | null;
+    autoRenew?: boolean;
 }
 
 export const usersApi = {
@@ -662,6 +805,19 @@ export const usersApi = {
         if (!res.ok) throw new Error('Failed to update profile');
         const data = await res.json();
         return data.message;
+    },
+    deleteAccount: async (token: string): Promise<string> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Users/me`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Error al cerrar cuenta');
+            return data.message;
+        } catch (error) {
+            throw error;
+        }
     }
 };
 
@@ -690,20 +846,18 @@ export interface CreateReviewDto {
 
 export const reviewsApi = {
     /** Create or update a review for a seller. */
-    createReview: async (data: CreateReviewDto, token: string): Promise<{ message: string }> => {
-        const res = await fetchApi(`${API_BASE_URL}/Reviews`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
-        });
-        if (!res.ok) {
-            const err = await res.text();
-            throw new Error(err || 'Error al crear reseña');
-        }
-        return await res.json();
+    createReview: async (sellerId: number, rating: number, comment: string, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Reviews`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ sellerId, rating, comment })
+            });
+            return res.ok;
+        } catch { return false; }
     },
 
     /** Get all reviews for a seller. */
@@ -775,11 +929,63 @@ export const notificationsApi = {
             headers: { 'Authorization': `Bearer ${token}` }
         });
     },
-    /** Mark all notifications as read. */
     markAllRead: async (token: string): Promise<void> => {
         await fetchApi(`${API_BASE_URL}/Notifications/read-all`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}` }
         });
+    }
+};
+
+export interface Dispute {
+    id: number;
+    orderId: number;
+    initiator: { id: number, name: string };
+    target: { id: number, name: string };
+    reason: string;
+    status: string;
+    createdAt: string;
+    adminResolution?: string;
+    orderTotal?: number;
+}
+
+export const disputesApi = {
+    open: async (orderId: number, reason: string, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Disputes`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId, reason })
+            });
+            return res.ok;
+        } catch { return false; }
+    },
+    getMyDisputes: async (token: string): Promise<Dispute[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Disputes/my-disputes`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    },
+    getAllAdmin: async (token: string): Promise<Dispute[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/disputes`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    },
+    resolveAdmin: async (id: number, resolution: string, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/disputes/${id}/resolve`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ resolution })
+            });
+            return res.ok;
+        } catch { return false; }
     }
 };

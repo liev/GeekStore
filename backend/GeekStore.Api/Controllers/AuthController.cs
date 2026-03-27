@@ -1,9 +1,12 @@
 using GeekStore.Application.Interfaces;
 using GeekStore.Core.Entities;
 using GeekStore.Core.Interfaces;
+using GeekStore.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using System;
-using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 
 namespace GeekStore.Api.Controllers
@@ -15,12 +18,14 @@ namespace GeekStore.Api.Controllers
         private readonly IAuthService _authService;
         private readonly IEmailService _emailService;
         private readonly IRepository<User> _userRepository;
+        private readonly GeekStoreDbContext _context;
 
-        public AuthController(IAuthService authService, IEmailService emailService, IRepository<User> userRepository)
+        public AuthController(IAuthService authService, IEmailService emailService, IRepository<User> userRepository, GeekStoreDbContext context)
         {
             _authService = authService;
             _emailService = emailService;
             _userRepository = userRepository;
+            _context = context;
         }
 
         public record LoginDto(string Email, string Password);
@@ -28,10 +33,10 @@ namespace GeekStore.Api.Controllers
         public record VerifyDto(string Email, string Code);
 
         [HttpPost("login")]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
-            var users = await _userRepository.ListAllAsync();
-            var user = users.FirstOrDefault(u => u.Email == dto.Email);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
 
             if (user != null && !user.IsVerified)
                 return BadRequest(new { message = "EMAIL_NOT_VERIFIED" });
@@ -42,15 +47,15 @@ namespace GeekStore.Api.Controllers
         }
 
         [HttpPost("register")]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
             // Check if email already exists
-            var existing = await _userRepository.ListAllAsync();
-            if (existing.Any(u => u.Email == dto.Email))
+            if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
                 return BadRequest(new { message = "Este correo ya está registrado." });
 
             // Generate 6-digit code
-            var code = new Random().Next(100000, 999999).ToString();
+            var code = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
 
             var user = new User
             {
@@ -84,8 +89,7 @@ namespace GeekStore.Api.Controllers
         [HttpPost("verify-email")]
         public async Task<IActionResult> VerifyEmail([FromBody] VerifyDto dto)
         {
-            var users = await _userRepository.ListAllAsync();
-            var user = users.FirstOrDefault(u => u.Email == dto.Email);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
 
             if (user == null)
                 return NotFound(new { message = "Usuario no encontrado." });
@@ -110,13 +114,12 @@ namespace GeekStore.Api.Controllers
         [HttpPost("resend-code")]
         public async Task<IActionResult> ResendCode([FromBody] string email)
         {
-            var users = await _userRepository.ListAllAsync();
-            var user = users.FirstOrDefault(u => u.Email == email);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
 
             if (user == null || user.IsVerified)
                 return BadRequest(new { message = "No se puede reenviar el código." });
 
-            var code = new Random().Next(100000, 999999).ToString();
+            var code = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
             user.VerificationCode = code;
             user.VerificationCodeExpiry = DateTime.UtcNow.AddMinutes(15);
             await _userRepository.UpdateAsync(user);

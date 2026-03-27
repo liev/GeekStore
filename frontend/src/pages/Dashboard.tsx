@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Trash2, Box, Eye, Image as ImageIcon, ArrowUpDown, Pencil, X, Package, CheckCircle, Truck, PackageCheck } from 'lucide-react';
-import { catalogApi, sellersApi, settingsApi, usersApi, ordersApi, type Product, type Order, type SellerAnalyticsDto } from '../api/client';
+import { catalogApi, sellersApi, settingsApi, usersApi, ordersApi, type Product, type Order, type SellerAnalyticsDto, type SubscriptionPlan } from '../api/client';
 import NotificationBell from '../components/NotificationBell';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
@@ -25,12 +25,20 @@ export default function Dashboard() {
     const [token, setToken] = useState<string | null>(null);
     const [sellerFee, setSellerFee] = useState<string>('0');
     const [subFeeUSD, setSubFeeUSD] = useState<string>('10.00');
+    const [paypalClientId, setPaypalClientId] = useState<string>('test');
+    const [paypalLoading, setPaypalLoading] = useState<boolean>(false);
+    const [paypalMessage, setPaypalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     // Subscription & Role State
     const [userRole, setUserRole] = useState<string>('Buyer');
     const [subPlan, setSubPlan] = useState<string>('Ninguno');
     const [subEndDate, setSubEndDate] = useState<string | null>(null);
     const [subAutoRenew, setSubAutoRenew] = useState<boolean>(false);
+
+    // Plans State
+    const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+    const [selectedNewPlan, setSelectedNewPlan] = useState<SubscriptionPlan | null>(null);
+    const [pendingUpgradeMsg, setPendingUpgradeMsg] = useState<string | null>(null);
     
     // Profile State
     const [sellerPhone, setSellerPhone] = useState<string>('');
@@ -43,6 +51,7 @@ export default function Dashboard() {
     const [moxfieldUrl, setMoxfieldUrl] = useState('');
     const [description, setDescription] = useState('');
     const [stockCount, setStockCount] = useState<number>(1);
+    const [sellerNote, setSellerNote] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
@@ -63,6 +72,7 @@ export default function Dashboard() {
     const [editDesc, setEditDesc] = useState('');
     const [editStock, setEditStock] = useState<number>(1);
     const [editCatId, setEditCatId] = useState<number>(1);
+    const [editSellerNote, setEditSellerNote] = useState('');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
 
     // Orders State
@@ -77,6 +87,18 @@ export default function Dashboard() {
         setEditDesc(p.description);
         setEditStock(p.stockCount);
         setEditCatId(p.categoryId);
+        setEditSellerNote(p.sellerNote || '');
+    };
+
+    const handleDeleteProduct = async (productId: number) => {
+        if (!token) return;
+        if (!confirm('¿Eliminar este producto? Esta acción no se puede deshacer.')) return;
+        try {
+            await catalogApi.deleteProduct(productId, token);
+            setInventory(prev => prev.filter(p => p.id !== productId));
+        } catch {
+            alert('No se pudo eliminar el producto.');
+        }
     };
 
     const handleSort = (column: keyof Product) => {
@@ -136,11 +158,27 @@ export default function Dashboard() {
         const fetchMetrics = async () => {
             if (sellerId !== null && token) {
                 try {
-                    const me = await usersApi.getMe(token);
+                    const [me, plansData, ppClientId] = await Promise.all([
+                        usersApi.getMe(token),
+                        settingsApi.getPlans(),
+                        settingsApi.getPayPalClientId(),
+                    ]);
+
                     setUserRole(me.role);
                     setSubPlan(me.subscriptionPlan || 'Ninguno');
                     setSubEndDate(me.subscriptionEndDate || null);
                     setSubAutoRenew(me.autoRenew || false);
+                    setPlans(plansData);
+                    setPaypalClientId(ppClientId);
+
+                    if (plansData.length > 0) setSelectedNewPlan(plansData[0]);
+
+                    // Set fee from first plan or legacy endpoint
+                    const currentPlanInfo = plansData.find(p => p.name === me.subscriptionPlan) ?? plansData[0];
+                    if (currentPlanInfo) {
+                        setSellerFee(currentPlanInfo.crcPrice.toString());
+                        setSubFeeUSD(currentPlanInfo.usdPrice.toFixed(2));
+                    }
 
                     if (me.role === 'Buyer' && activeTab === 'inventory') {
                         setActiveTab('subscription');
@@ -151,16 +189,29 @@ export default function Dashboard() {
                         setMetrics(data);
                     }
 
-                    const fee = await settingsApi.getSellerFee();
-                    setSellerFee(fee);
-                    // Conversion to USD (approx 500 CRC to 1 USD)
-                    const feeUSD = Math.max((parseFloat(fee) / 500), 1).toFixed(2);
-                    setSubFeeUSD(feeUSD);
-
                     // Fetch Profile Data for Phone
                     if (sellerId) {
                         const profile = await usersApi.getProfile(sellerId, token);
                         setSellerPhone(profile.phoneNumber || '');
+                    }
+
+                    // Check for pending seller upgrade (from registration flow)
+                    const pending = localStorage.getItem('pendingSellerUpgrade');
+                    if (pending && me.role === 'Buyer') {
+                        try {
+                            const { plan, orderId } = JSON.parse(pending);
+                            const msg = await usersApi.upgradeToSeller(plan, orderId, token);
+                            localStorage.removeItem('pendingSellerUpgrade');
+                            setUserRole('Seller');
+                            setSubPlan(plan);
+                            setSubAutoRenew(true);
+                            setSubEndDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
+                            setPendingUpgradeMsg(msg);
+                            setActiveTab('subscription');
+                        } catch (err) {
+                            console.error('Pending upgrade failed:', err);
+                            setPendingUpgradeMsg('Error activando plan. Contacta soporte.');
+                        }
                     }
                 } catch (err) {
                     console.error("Error fetching metrics", err);
@@ -372,7 +423,7 @@ export default function Dashboard() {
                                                 <td className="p-4 text-right flex justify-end gap-2">
                                                     <button onClick={() => openEditModal(product)} className="text-slate-400 hover:text-neon-blue p-2 rounded-lg hover:bg-slate-700 transition-colors"><Pencil size={18} /></button>
                                                     <button className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors"><Eye size={18} /></button>
-                                                    <button className="text-slate-400 hover:text-red-400 p-2 rounded-lg hover:bg-slate-700 transition-colors"><Trash2 size={18} /></button>
+                                                    <button onClick={() => handleDeleteProduct(product.id)} className="text-slate-400 hover:text-red-400 p-2 rounded-lg hover:bg-slate-700 transition-colors"><Trash2 size={18} /></button>
                                                 </td>
                                             </tr>
                                         ))
@@ -599,13 +650,25 @@ export default function Dashboard() {
                                 </div>
 
                                 <div className="col-span-1 md:col-span-2 space-y-2">
-                                    <label className="block text-slate-300 font-sans font-medium text-sm">Descripción</label>
                                     <textarea
                                         rows={4}
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-blue rounded-lg text-white p-3.5 font-sans outline-none resize-none transition-colors shadow-inner"
                                         placeholder="Ingrese condición, detalles, etc..."
+                                    ></textarea>
+                                </div>
+
+                                <div className="col-span-1 md:col-span-2 space-y-2">
+                                    <label className="block text-neon-blue font-sans font-medium text-sm flex items-center gap-2">
+                                        <Pencil size={14} /> Nota del Vendedor (Visible para Admin y en checkout)
+                                    </label>
+                                    <textarea
+                                        rows={2}
+                                        value={sellerNote}
+                                        onChange={(e) => setSellerNote(e.target.value)}
+                                        className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-blue rounded-lg text-white p-3.5 font-sans outline-none resize-none transition-colors shadow-inner"
+                                        placeholder="ej. Firmada, Leve rasguño en esquina, etc."
                                     ></textarea>
                                 </div>
 
@@ -635,6 +698,7 @@ export default function Dashboard() {
                                                     imageUrl: imageUrls[0] || '',
                                                     imageUrl2: imageUrls[1] || '',
                                                     imageUrl3: imageUrls[2] || '',
+                                                    sellerNote,
                                                     stockStatus: 'Available',
                                                     stockCount: stockCount
                                                 };
@@ -649,6 +713,7 @@ export default function Dashboard() {
                                                 setCategoryId(1);
                                                 setMoxfieldUrl('');
                                                 setDescription('');
+                                                setSellerNote('');
                                                 setStockCount(1);
                                                 setImageUrls([]);
                                             } catch (error) {
@@ -670,32 +735,62 @@ export default function Dashboard() {
                     )}
 
                     {activeTab === 'subscription' && (
-                        <div className="relative z-10 w-full max-w-2xl mx-auto space-y-8 animate-in fade-in flex flex-col items-center">
-                            <div className="text-center mb-6">
+                        <div className="relative z-10 w-full max-w-2xl mx-auto space-y-6 animate-in fade-in flex flex-col items-center">
+                            <div className="text-center mb-2">
                                 <h2 className="text-3xl font-display font-bold text-yellow-400 drop-shadow-[0_0_12px_rgba(250,204,21,0.6)] mb-2">Licencia de Gremio</h2>
-                                <p className="text-slate-300 font-sans text-lg">Controla tu contrato mercantil y acceso al Marketplace principal.</p>
+                                <p className="text-slate-300 font-sans">Controla tu contrato mercantil y acceso al Marketplace.</p>
                             </div>
 
-                            <div className="glass-panel p-8 rounded-2xl border border-yellow-400/50 relative overflow-hidden shadow-[0_0_30px_rgba(250,204,21,0.15)] w-full text-center">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/20 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-                                
-                                {userRole === 'Seller' ? (
-                                    <>
-                                        <h3 className="text-2xl font-display text-white mb-2">Estado: <span className="text-emerald-400">ACTIVO</span></h3>
-                                        <p className="text-slate-300 text-sm font-sans mb-4">Plan Actual: <span className="text-neon-pink font-bold">{subPlan}</span></p>
-                                        <p className="text-slate-300 text-sm font-sans mb-6">Vigente hasta: <span className="text-white font-bold">{subEndDate ? new Date(subEndDate).toLocaleDateString('es-CR') : 'Indefinido'}</span></p>
-                                        
+                            {/* Pending upgrade success/error */}
+                            {pendingUpgradeMsg && (
+                                <div className={`w-full p-4 rounded-xl text-center font-sans text-sm font-semibold border ${pendingUpgradeMsg.startsWith('Error') ? 'bg-red-500/20 border-red-500/40 text-red-400' : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'}`}>
+                                    {pendingUpgradeMsg}
+                                </div>
+                            )}
+
+                            {userRole === 'Seller' ? (
+                                <>
+                                    {/* Current plan status */}
+                                    <div className="glass-panel p-6 rounded-2xl border border-yellow-400/50 relative overflow-hidden shadow-[0_0_30px_rgba(250,204,21,0.15)] w-full text-center">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/20 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+                                        {(() => {
+                                            const currentPlan = plans.find(p => p.name === subPlan);
+                                            return (
+                                                <>
+                                                    <p className="text-3xl mb-1">{currentPlan?.emoji ?? '⚔'}</p>
+                                                    <h3 className="text-2xl font-display text-white mb-1">
+                                                        Estado: <span className="text-emerald-400">ACTIVO</span>
+                                                    </h3>
+                                                    <p className="text-neon-pink font-bold text-lg mb-1">{subPlan}</p>
+                                                    {currentPlan && (
+                                                        <p className="text-slate-400 text-sm mb-1">
+                                                            ₡{currentPlan.crcPrice.toLocaleString('es-CR')}/mes · ${currentPlan.usdPrice.toFixed(2)} USD ·{' '}
+                                                            {currentPlan.maxProducts === null ? '∞ productos' : `${currentPlan.maxProducts} productos`}
+                                                        </p>
+                                                    )}
+                                                    <p className="text-slate-300 text-sm font-sans mb-4">
+                                                        Vigente hasta: <span className="text-white font-bold">{subEndDate ? new Date(subEndDate).toLocaleDateString('es-CR') : 'Indefinido'}</span>
+                                                    </p>
+                                                </>
+                                            );
+                                        })()}
+
                                         {subAutoRenew ? (
-                                            <div className="space-y-4 max-w-sm mx-auto z-20 relative">
-                                                <p className="text-emerald-400 text-xs font-bold uppercase mb-2 animate-pulse">↻ Renovación Automática Activada</p>
-                                                <button 
+                                            <div className="space-y-3 max-w-sm mx-auto z-20 relative">
+                                                <p className="text-emerald-400 text-xs font-bold uppercase animate-pulse">↻ Renovación Automática Activada</p>
+                                                {paypalMessage && (
+                                                    <p className={`text-sm font-semibold py-2 px-4 rounded-xl ${paypalMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                        {paypalMessage.text}
+                                                    </p>
+                                                )}
+                                                <button
                                                     onClick={async () => {
                                                         try {
                                                             const msg = await usersApi.cancelSubscription(token!);
-                                                            alert(msg);
                                                             setSubAutoRenew(false);
+                                                            setPaypalMessage({ type: 'success', text: msg });
                                                         } catch (err) {
-                                                            alert(err instanceof Error ? err.message : 'Error al cancelar la renovación.');
+                                                            setPaypalMessage({ type: 'error', text: err instanceof Error ? err.message : 'Error al cancelar la renovación.' });
                                                         }
                                                     }}
                                                     className="w-full bg-red-500/10 text-red-500 border border-red-500/50 font-sans font-bold py-3 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-lg"
@@ -704,66 +799,184 @@ export default function Dashboard() {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="space-y-4 max-w-sm mx-auto z-20 relative">
-                                                <p className="text-slate-400 text-xs font-bold uppercase mb-2">Renovación automática pausada. Adquiere o renueva ahora.</p>
-                                                <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", currency: "USD", intent: "capture" }}>
-                                                    <PayPalButtons 
+                                            <div className="space-y-3 max-w-sm mx-auto z-20 relative">
+                                                <p className="text-slate-400 text-xs font-bold uppercase">Renovación automática pausada. Renueva ahora.</p>
+                                                {paypalMessage && (
+                                                    <p className={`text-sm font-semibold py-2 px-4 rounded-xl ${paypalMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                        {paypalMessage.text}
+                                                    </p>
+                                                )}
+                                                {paypalLoading ? (
+                                                    <p className="text-center text-neon-blue font-retro animate-pulse text-sm">PROCESANDO PAGO...</p>
+                                                ) : (
+                                                    <PayPalScriptProvider options={{ clientId: paypalClientId, currency: "USD", intent: "capture" }}>
+                                                        <PayPalButtons
+                                                            style={{ layout: "vertical", shape: "pill", color: "gold" }}
+                                                            createOrder={(_data, actions) => {
+                                                                const planInfo = plans.find(p => p.name === subPlan) ?? plans[0];
+                                                                return actions.order.create({
+                                                                    intent: "CAPTURE",
+                                                                    purchase_units: [{ description: `Renovación ${subPlan}`, amount: { value: planInfo?.usdPrice.toFixed(2) ?? subFeeUSD, currency_code: "USD" } }],
+                                                                });
+                                                            }}
+                                                            onApprove={async (_data, actions) => {
+                                                                if (!actions.order) return;
+                                                                setPaypalLoading(true);
+                                                                setPaypalMessage(null);
+                                                                try {
+                                                                    const order = await actions.order.capture();
+                                                                    const msg = await usersApi.upgradeToSeller(subPlan, order.id || '', token!);
+                                                                    setSubAutoRenew(true);
+                                                                    setSubEndDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
+                                                                    setPaypalMessage({ type: 'success', text: msg });
+                                                                } catch (err) {
+                                                                    setPaypalMessage({ type: 'error', text: err instanceof Error ? err.message : 'Error renovando la suscripción.' });
+                                                                } finally {
+                                                                    setPaypalLoading(false);
+                                                                }
+                                                            }}
+                                                        />
+                                                    </PayPalScriptProvider>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Upgrade to higher tier */}
+                                    {plans.length > 1 && (() => {
+                                        const currentIdx = plans.findIndex(p => p.name === subPlan);
+                                        const upgradePlans = currentIdx >= 0 ? plans.slice(currentIdx + 1) : [];
+                                        if (upgradePlans.length === 0) return null;
+                                        return (
+                                            <div className="w-full">
+                                                <h3 className="text-sm font-sans font-bold text-slate-400 uppercase tracking-widest mb-3">Subir de Rango</h3>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {upgradePlans.map(plan => (
+                                                        <button
+                                                            key={plan.name}
+                                                            onClick={() => { setSelectedNewPlan(plan); }}
+                                                            className={`flex flex-col items-start p-3 rounded-xl border-2 transition-all text-left ${selectedNewPlan?.name === plan.name ? 'border-neon-pink bg-neon-pink/10' : 'border-slate-700 hover:border-slate-500 bg-slate-900/30'}`}
+                                                        >
+                                                            <div className="flex items-center gap-1.5 mb-1">
+                                                                <span className="text-base">{plan.emoji}</span>
+                                                                <span className="text-xs font-bold text-white">{plan.name.replace('Goblin ', '')}</span>
+                                                            </div>
+                                                            <p className="text-neon-blue font-bold text-sm">₡{plan.crcPrice.toLocaleString('es-CR')}/mes</p>
+                                                            <p className="text-slate-500 text-[10px]">{plan.maxProducts === null ? '∞' : plan.maxProducts} productos</p>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                {selectedNewPlan && plans.findIndex(p => p.name === subPlan) < plans.findIndex(p => p.name === selectedNewPlan.name) && (
+                                                    <div className="mt-4 max-w-sm mx-auto">
+                                                        {paypalLoading ? (
+                                                            <p className="text-center text-neon-blue font-retro animate-pulse text-sm">PROCESANDO PAGO...</p>
+                                                        ) : (
+                                                            <PayPalScriptProvider options={{ clientId: paypalClientId, currency: "USD", intent: "capture" }}>
+                                                                <PayPalButtons
+                                                                    style={{ layout: "vertical", shape: "pill", color: "gold" }}
+                                                                    createOrder={(_data, actions) => {
+                                                                        return actions.order.create({
+                                                                            intent: "CAPTURE",
+                                                                            purchase_units: [{ description: `Upgrade a ${selectedNewPlan.name}`, amount: { value: selectedNewPlan.usdPrice.toFixed(2), currency_code: "USD" } }],
+                                                                        });
+                                                                    }}
+                                                                    onApprove={async (_data, actions) => {
+                                                                        if (!actions.order) return;
+                                                                        setPaypalLoading(true);
+                                                                        setPaypalMessage(null);
+                                                                        try {
+                                                                            const order = await actions.order.capture();
+                                                                            const msg = await usersApi.upgradeToSeller(selectedNewPlan.name, order.id || '', token!);
+                                                                            setSubPlan(selectedNewPlan.name);
+                                                                            setSubAutoRenew(true);
+                                                                            setSubEndDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
+                                                                            setPaypalMessage({ type: 'success', text: msg });
+                                                                        } catch (err) {
+                                                                            setPaypalMessage({ type: 'error', text: err instanceof Error ? err.message : 'Error procesando upgrade.' });
+                                                                        } finally {
+                                                                            setPaypalLoading(false);
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </PayPalScriptProvider>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </>
+                            ) : (
+                                /* Buyer: plan selection + activation */
+                                <div className="w-full space-y-4">
+                                    <h3 className="text-center text-xl font-display text-white">Elige tu Plan de Vendedor</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {plans.map(plan => (
+                                            <button
+                                                key={plan.name}
+                                                onClick={() => setSelectedNewPlan(plan)}
+                                                className={`flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left ${selectedNewPlan?.name === plan.name ? 'border-neon-pink bg-neon-pink/10' : 'border-slate-700 hover:border-slate-500 bg-slate-900/30'}`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-xl">{plan.emoji}</span>
+                                                    <span className="text-sm font-bold text-white">{plan.name.replace('Goblin ', '')}</span>
+                                                </div>
+                                                <p className="text-neon-blue font-bold text-lg">₡{plan.crcPrice.toLocaleString('es-CR')}</p>
+                                                <p className="text-slate-400 text-xs">${plan.usdPrice.toFixed(2)} USD/mes</p>
+                                                <p className="text-slate-500 text-xs">{plan.maxProducts === null ? '∞ productos' : `${plan.maxProducts} productos`}</p>
+                                                {plan.isFounder && (
+                                                    <span className="text-[10px] bg-yellow-400/20 text-yellow-400 border border-yellow-400/40 px-2 py-0.5 rounded font-bold mt-1">
+                                                        ⭐ FUNDADOR ({plan.founderSlotsLeft} slots)
+                                                    </span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {selectedNewPlan && (
+                                        <div className="max-w-sm mx-auto space-y-3">
+                                            {paypalMessage && (
+                                                <p className={`text-sm font-semibold text-center py-2 px-4 rounded-xl ${paypalMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                    {paypalMessage.text}
+                                                </p>
+                                            )}
+                                            {paypalLoading ? (
+                                                <p className="text-center text-neon-blue font-retro animate-pulse text-sm">PROCESANDO PAGO...</p>
+                                            ) : (
+                                                <PayPalScriptProvider options={{ clientId: paypalClientId, currency: "USD", intent: "capture" }}>
+                                                    <PayPalButtons
                                                         style={{ layout: "vertical", shape: "pill", color: "gold" }}
                                                         createOrder={(_data, actions) => {
                                                             return actions.order.create({
                                                                 intent: "CAPTURE",
-                                                                purchase_units: [{ description: "Renovación Licencia Mercante", amount: { value: subFeeUSD, currency_code: "USD" } }],
+                                                                purchase_units: [{ description: `Suscripción ${selectedNewPlan.name}`, amount: { value: selectedNewPlan.usdPrice.toFixed(2), currency_code: "USD" } }],
                                                             });
                                                         }}
                                                         onApprove={async (_data, actions) => {
                                                             if (!actions.order) return;
-                                                            const order = await actions.order.capture();
+                                                            setPaypalLoading(true);
+                                                            setPaypalMessage(null);
                                                             try {
-                                                                await usersApi.upgradeToSeller('Licencia Mercante', order.id || '', token!);
-                                                                alert("Suscripción renovada exitosamente.");
-                                                                window.location.reload();
+                                                                const order = await actions.order.capture();
+                                                                const msg = await usersApi.upgradeToSeller(selectedNewPlan.name, order.id || '', token!);
+                                                                setUserRole('Seller');
+                                                                setSubPlan(selectedNewPlan.name);
+                                                                setSubAutoRenew(true);
+                                                                setSubEndDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
+                                                                setPaypalMessage({ type: 'success', text: msg });
                                                             } catch (err) {
-                                                                alert("Error renovando la suscripción.");
+                                                                setPaypalMessage({ type: 'error', text: err instanceof Error ? err.message : 'Error procesando pago.' });
+                                                            } finally {
+                                                                setPaypalLoading(false);
                                                             }
                                                         }}
                                                     />
                                                 </PayPalScriptProvider>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <>
-                                        <h3 className="text-xl font-display text-white mb-2">Adquirir Licencia Mercante</h3>
-                                        <p className="text-4xl font-black text-neon-blue drop-shadow-[0_0_10px_rgba(0,240,255,0.6)] mb-6">₡{parseFloat(sellerFee).toLocaleString('es-CR')}<span className="text-sm">/mes</span></p>
-                                        <p className="text-sm font-retro text-slate-400 tracking-wider mb-8">~ ${subFeeUSD} USD</p>
-                                        
-                                        <div className="space-y-4 max-w-sm mx-auto z-20 relative">
-                                            <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", currency: "USD", intent: "capture" }}>
-                                                <PayPalButtons 
-                                                    style={{ layout: "vertical", shape: "pill", color: "gold" }}
-                                                    createOrder={(_data, actions) => {
-                                                        return actions.order.create({
-                                                            intent: "CAPTURE",
-                                                            purchase_units: [{ description: "Suscripción Mensual GeekStore", amount: { value: subFeeUSD, currency_code: "USD" } }],
-                                                        });
-                                                    }}
-                                                    onApprove={async (_data, actions) => {
-                                                        if (!actions.order) return;
-                                                        const order = await actions.order.capture();
-                                                        try {
-                                                            await usersApi.upgradeToSeller('Licencia Mercante', order.id || '', token!);
-                                                            alert("¡Felicidades! Has sido ascendido a Goblin Mercader en GeekStore.");
-                                                            window.location.reload();
-                                                        } catch (err) {
-                                                            alert("Error procesando pago y ascenso.");
-                                                        }
-                                                    }}
-                                                />
-                                            </PayPalScriptProvider>
+                                            )}
                                         </div>
-                                    </>
-                                )}
-                            </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -806,6 +1019,27 @@ export default function Dashboard() {
                                 >
                                     {isSavingProfile ? 'GUARDANDO...' : 'GUARDAR CONTACTO DE WHATSAPP'}
                                 </button>
+
+                                <div className="mt-12 pt-8 border-t border-slate-700/50 flex flex-col items-center">
+                                    <p className="text-slate-500 text-xs font-sans mb-4 uppercase tracking-widest">Zona de Peligro</p>
+                                    <button
+                                        onClick={async () => {
+                                            if (!token) return;
+                                            if (!confirm('¿Cerrar tu cuenta definitivamente? Esta acción ocultará todos tus productos y no podrás volver a entrar.')) return;
+                                            try {
+                                                const msg = await usersApi.deleteAccount(token);
+                                                alert(msg);
+                                                localStorage.removeItem('geekstore_token');
+                                                navigate('/login');
+                                            } catch (err) {
+                                                alert(err instanceof Error ? err.message : 'Error al cerrar cuenta');
+                                            }
+                                        }}
+                                        className="text-red-500/60 hover:text-red-500 text-sm font-sans underline transition-colors"
+                                    >
+                                        Cerrar mi cuenta definitivamente
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -863,6 +1097,12 @@ export default function Dashboard() {
                                                             <span className="text-slate-500">Comprador:</span>{' '}
                                                             <span className="font-medium text-white">{order.buyer?.nickname || order.buyer?.name || `ID ${order.buyerId}`}</span>
                                                         </div>
+                                                        {order.deliveryMethod === 'Pickup' && order.deliveryPoint && (
+                                                            <div className="text-sm text-slate-300 font-sans mb-1">
+                                                                <span className="text-slate-500">Retiro en:</span>{' '}
+                                                                <span className="font-medium text-neon-yellow">{order.deliveryPoint.name}</span>
+                                                            </div>
+                                                        )}
                                                         <div className="flex flex-wrap gap-2 mt-2">
                                                             {order.items.map(item => (
                                                                 <span key={item.id} className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 font-sans">
@@ -945,7 +1185,11 @@ export default function Dashboard() {
                             </div>
                             <div className="space-y-2">
                                 <label className="block text-slate-300 font-sans font-medium text-sm">Descripción</label>
-                                <textarea rows={3} value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="w-full bg-slate-800 border border-slate-700 focus:border-neon-blue rounded-lg text-white p-3 font-sans outline-none resize-none"></textarea>
+                                <textarea rows={3} value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="w-full bg-slate-800 border border-slate-700 focus:border-neon-blue rounded-lg text-white p-3 font-sans outline-none resize-none transition-colors"></textarea>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="block text-neon-blue font-sans font-medium text-sm">Nota del Vendedor</label>
+                                <textarea rows={2} value={editSellerNote} onChange={(e) => setEditSellerNote(e.target.value)} className="w-full bg-slate-800 border border-slate-700 focus:border-neon-blue rounded-lg text-white p-3 font-sans outline-none resize-none transition-colors"></textarea>
                             </div>
                             <p className="text-xs text-slate-500 font-sans mt-2">Nota: Actualmente las imágenes no se pueden cambiar tras la inicialización. Debes borrar y recrear el registro.</p>
                         </div>
@@ -963,6 +1207,7 @@ export default function Dashboard() {
                                             description: editDesc,
                                             stockCount: editStock,
                                             categoryId: editCatId,
+                                            sellerNote: editSellerNote,
                                             stockStatus: editStock > 0 ? 'Available' : 'Sold'
                                         };
                                         await catalogApi.updateProduct(editingProduct.id, updates, token!);

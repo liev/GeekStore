@@ -28,32 +28,25 @@ namespace GeekStore.Application.Services
         {
             var users = await _userRepository.ListAllAsync();
             var user = users.FirstOrDefault(u => u.Email == email);
-            
-            // Custom Admin Bypass for Hackathon Demo
-            if (email == "goblinlead@globlinspot" && password == "krenco2026!") {
-                user = new User { Id = 0, Email = email, Role = "Admin", Name = "Super", Surname = "Admin", IsVerified = true };
-            }
-            // Fallback for previous debug seller
-            else if (user == null && email == "vendedor@sistema.com") {
-                user = new User { Id = 1, Email = email, Role = "Seller", Name = "Admin", IsVerified = true };
-            }
 
-            if (user == null) return string.Empty; 
+            if (user == null) return string.Empty;
 
-            // Basic comparison for prototype. In production, use BCrypt/PasswordHasher.
+            if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+                return string.Empty;
+
             return GenerateJwtToken(user);
         }
 
         public async Task<User> RegisterAsync(User user, string password)
         {
-            // Hash password before saving
-            // user.PasswordHash = Hash(password);
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
             return await _userRepository.AddAsync(user);
         }
 
         private string GenerateJwtToken(User user)
         {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"] ?? "ThisIsASecretKeyForJWTTokenGenerationEnsureItIsAtLeast32BytesLong!"));
+            var jwtKey = _config["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key must be configured.");
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
@@ -70,7 +63,7 @@ namespace GeekStore.Application.Services
                 issuer: issuer,
                 audience: issuer,
                 claims: claims,
-                expires: DateTime.Now.AddHours(2),
+                expires: DateTime.UtcNow.AddHours(2),
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);

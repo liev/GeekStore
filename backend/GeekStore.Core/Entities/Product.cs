@@ -39,6 +39,9 @@ namespace GeekStore.Core.Entities
         // "MP" (Moderately Played), "HP" (Heavily Played), "DMG" (Damaged)
         public string Condition { get; set; } = "NM";
 
+        // Description provided by seller for the specific item (condition details, etc.)
+        public string SellerNote { get; set; } = string.Empty;
+
         // Which exchange point is preferred (optional)
         public int? PreferredDeliveryPointId { get; set; }
         public DeliveryPoint? PreferredDeliveryPoint { get; set; }

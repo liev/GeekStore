@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace GeekStore.Core.Entities
 {
@@ -9,6 +10,7 @@ namespace GeekStore.Core.Entities
         public string Surname { get; set; } = string.Empty;
         public string Nickname { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        [JsonIgnore]
         public string PasswordHash { get; set; } = string.Empty;
         
         // Roles: "Admin", "Seller"
@@ -19,7 +21,9 @@ namespace GeekStore.Core.Entities
         
         // Email verification
         public bool IsVerified { get; set; } = false;
+        [JsonIgnore]
         public string? VerificationCode { get; set; }
+        [JsonIgnore]
         public DateTime? VerificationCodeExpiry { get; set; }
         
         // P2P / WhatsApp integration

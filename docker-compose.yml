@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: geekstore
-      POSTGRES_PASSWORD: geekstore123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geekstore123}
       POSTGRES_DB: geekstore
     ports:
       - "5432:5432"
@@ -25,6 +25,7 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:5242
       DATABASE_URL: Host=postgres-db;Port=5432;Database=geekstore;Username=geekstore;Password=geekstore123
+      AllowedOrigins: ${ALLOWED_ORIGINS:-http://localhost:5173}
     ports:
       - "5242:5242"
     depends_on:

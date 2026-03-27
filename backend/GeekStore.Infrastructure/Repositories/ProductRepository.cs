@@ -50,7 +50,11 @@ namespace GeekStore.Infrastructure.Repositories
 
             if (query.CategoryId.HasValue)
             {
-                queryable = queryable.Where(p => p.CategoryId == query.CategoryId.Value);
+                var categoryIds = await _dbContext.Categories
+                    .Where(c => c.Id == query.CategoryId.Value || c.ParentId == query.CategoryId.Value)
+                    .Select(c => c.Id)
+                    .ToListAsync();
+                queryable = queryable.Where(p => p.CategoryId.HasValue && categoryIds.Contains(p.CategoryId.Value));
             }
 
             if (!string.IsNullOrWhiteSpace(query.Condition))

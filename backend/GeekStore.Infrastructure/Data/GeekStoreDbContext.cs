@@ -19,6 +19,8 @@ namespace GeekStore.Infrastructure.Data
         public DbSet<UserFollow> UserFollows { get; set; }
         public DbSet<Review> Reviews { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<Dispute> Disputes { get; set; }
+        public DbSet<Refund> Refunds { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -45,6 +47,32 @@ namespace GeekStore.Infrastructure.Data
                 .HasOne(r => r.Reviewer)
                 .WithMany()
                 .HasForeignKey(r => r.ReviewerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure Dispute -> User relationships
+            modelBuilder.Entity<Dispute>()
+                .HasOne(d => d.InitiatorUser)
+                .WithMany()
+                .HasForeignKey(d => d.InitiatorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Dispute>()
+                .HasOne(d => d.TargetUser)
+                .WithMany()
+                .HasForeignKey(d => d.TargetUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure Refund relationships
+            modelBuilder.Entity<Refund>()
+                .HasOne(r => r.Dispute)
+                .WithMany()
+                .HasForeignKey(r => r.DisputeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Refund>()
+                .HasOne(r => r.BeneficiaryUser)
+                .WithMany()
+                .HasForeignKey(r => r.BeneficiaryUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Review>()

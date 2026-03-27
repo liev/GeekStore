@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authApi, settingsApi } from '../api/client';
+import { authApi, settingsApi, type SubscriptionPlan } from '../api/client';
 import { UserPlus } from 'lucide-react';
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
@@ -19,8 +19,12 @@ export default function Login() {
     const [regNickname, setRegNickname] = useState('');
     const [regEmail, setRegEmail] = useState('');
     const [regPassword, setRegPassword] = useState('');
-    const [regRole, setRegRole] = useState<'Seller' | 'Buyer'>('Seller');
-    const [sellerFee, setSellerFee] = useState('0.00');
+    const [regRole, setRegRole] = useState<'Seller' | 'Buyer'>('Buyer');
+
+    // Plan selection
+    const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+    const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
+    const [paypalClientId, setPaypalClientId] = useState<string>('test');
 
     // Payment State
     const [showPayment, setShowPayment] = useState(false);
@@ -32,11 +36,16 @@ export default function Login() {
     const [verifySuccess, setVerifySuccess] = useState(false);
 
     useEffect(() => {
-        const fetchFee = async () => {
-            const fee = await settingsApi.getSellerFee();
-            setSellerFee(fee);
+        const fetchData = async () => {
+            const [plansData, clientId] = await Promise.all([
+                settingsApi.getPlans(),
+                settingsApi.getPayPalClientId(),
+            ]);
+            setPlans(plansData);
+            if (plansData.length > 0) setSelectedPlan(plansData[0]);
+            setPaypalClientId(clientId);
         };
-        fetchFee();
+        fetchData();
     }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -53,7 +62,6 @@ export default function Login() {
                 setError('ACCESO DENEGADO: Credenciales inválidas');
             }
         } catch (err: unknown) {
-            // Handle unverified account
             const msg = (err as { message?: string })?.message ?? '';
             if (msg.includes('EMAIL_NOT_VERIFIED') || msg.includes('400')) {
                 setVerifyEmail(email);
@@ -72,13 +80,8 @@ export default function Login() {
         setError('');
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:5242/api/Auth/verify-email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: verifyEmail, code: verifyCode })
-            });
-            const data = await res.json();
-            if (res.ok) {
+            const result = await authApi.verifyEmail(verifyEmail, verifyCode);
+            if (result.ok) {
                 setVerifySuccess(true);
                 setError('');
                 setTimeout(() => {
@@ -88,7 +91,7 @@ export default function Login() {
                     setEmail(verifyEmail);
                 }, 2500);
             } else {
-                setError(data.message ?? 'Código incorrecto');
+                setError(result.message ?? 'Código incorrecto');
             }
         } catch { setError('Error de conexión'); }
         finally { setLoading(false); }
@@ -96,14 +99,12 @@ export default function Login() {
 
     const handleResendCode = async () => {
         setError('');
-        try {
-            await fetch('http://localhost:5242/api/Auth/resend-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(verifyEmail)
-            });
+        const ok = await authApi.resendCode(verifyEmail);
+        if (ok) {
             setError('Código reenviado. Revisa tu correo.');
-        } catch { setError('No se pudo reenviar el código.'); }
+        } else {
+            setError('No se pudo reenviar el código.');
+        }
     };
 
     const handleRegister = async (e: React.FormEvent) => {
@@ -113,11 +114,10 @@ export default function Login() {
             setError('Faltan campos obligatorios');
             return;
         }
-        // Sellers go through payment; buyers register directly
         if (regRole === 'Seller') {
+            if (!selectedPlan) { setError('Selecciona un plan'); return; }
             setShowPayment(true);
         } else {
-            // Buyer: register immediately (no payment)
             setLoading(true);
             try {
                 const success = await authApi.register({
@@ -126,7 +126,7 @@ export default function Login() {
                     Nickname: regNickname,
                     Email: regEmail,
                     Password: regPassword,
-                    Role: regRole
+                    Role: 'Buyer'
                 });
                 if (success) {
                     setVerifyEmail(regEmail);
@@ -139,30 +139,36 @@ export default function Login() {
         }
     };
 
-    const handlePayment = async () => {
+    // Called after PayPal payment is captured
+    const handlePaymentCapture = async (orderId: string) => {
         setError('');
         setLoading(true);
-
         try {
+            // 1. Register as Buyer (email verification required before upgrade)
             const success = await authApi.register({
                 Name: regName,
                 Surname: regSurname,
                 Nickname: regNickname,
                 Email: regEmail,
                 Password: regPassword,
-                Role: regRole
+                Role: 'Buyer'
             });
 
             if (success) {
+                // 2. Store pending upgrade to be completed after login
+                localStorage.setItem('pendingSellerUpgrade', JSON.stringify({
+                    plan: selectedPlan!.name,
+                    orderId
+                }));
                 setShowPayment(false);
                 setVerifyEmail(regEmail);
                 setShowVerification(true);
             } else {
-                setError('ERROR EN EL REGISTRO. INTENTE DE NUEVO.');
+                setError('ERROR EN EL REGISTRO. El pago fue procesado — contacta soporte si el problema persiste.');
                 setShowPayment(false);
             }
         } catch {
-            setError('ERROR DE CONEXIÓN');
+            setError('ERROR DE CONEXIÓN. El pago fue procesado — contacta soporte.');
             setShowPayment(false);
         } finally {
             setLoading(false);
@@ -175,7 +181,6 @@ export default function Login() {
             <div className="bg-vaporwave-grid opacity-30 fixed inset-0" />
 
             <div className="z-10 relative w-full max-w-md">
-                {/* Header terminal style */}
                 <div className="text-center mb-8" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
                     <img src="/logo.png" alt="Goblin Spot Logo" className="h-28 mx-auto mb-4 mix-blend-screen drop-shadow-[0_0_14px_rgba(74,222,128,0.5)] hover:scale-105 transition-transform" />
                     <h1 className="text-3xl font-display font-black tracking-tight uppercase">
@@ -187,7 +192,7 @@ export default function Login() {
                     </p>
                 </div>
 
-                {/* ── Email Verification Screen ───────────────────────── */}
+                {/* ── Email Verification Screen ── */}
                 {showVerification && (
                     <div className="glass-panel p-6 sm:p-8 rounded-2xl relative shadow-2xl border border-neon-blue/40 text-center">
                         {verifySuccess ? (
@@ -200,10 +205,15 @@ export default function Login() {
                             <>
                                 <div className="text-4xl mb-4">📧</div>
                                 <h2 className="text-2xl font-display font-bold text-white mb-2">Verifica tu Goblin</h2>
-                                <p className="text-slate-300 font-sans text-sm mb-6">
+                                <p className="text-slate-300 font-sans text-sm mb-2">
                                     Enviamos un código de 6 dígitos a<br />
                                     <span className="text-neon-blue font-semibold">{verifyEmail}</span>
                                 </p>
+                                {localStorage.getItem('pendingSellerUpgrade') && (
+                                    <p className="text-neon-yellow font-sans text-xs mb-4 bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-2">
+                                        Después de verificar y hacer login, tu plan de vendedor se activará automáticamente.
+                                    </p>
+                                )}
                                 {error && (
                                     <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm mb-4">{error}</div>
                                 )}
@@ -256,92 +266,78 @@ export default function Login() {
                                     {error}
                                 </div>
                             )}
-
                             <div className="space-y-2">
                                 <label className="block text-slate-300 font-sans font-medium text-sm">IDENTIFICACIÓN (Correo)</label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                    autoComplete="email"
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email"
                                     className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-blue rounded-lg text-white p-3.5 font-sans outline-none transition-colors shadow-inner"
-                                    placeholder="vendedor@sistema.com"
-                                />
+                                    placeholder="vendedor@sistema.com" />
                             </div>
-
                             <div className="space-y-2">
                                 <label className="block text-slate-300 font-sans font-medium text-sm">CÓDIGO DE ACCESO (Contraseña)</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    autoComplete="current-password"
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password"
                                     className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-3.5 font-sans outline-none transition-colors shadow-inner"
-                                    placeholder="••••••••"
-                                />
+                                    placeholder="••••••••" />
                             </div>
-
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className={`w-full bg-gradient-to-r from-neon-blue to-cyan-500 text-slate-900 font-sans font-bold text-lg py-4 rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-1 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-neon-blue/40'}`}
-                            >
+                            <button type="submit" disabled={loading}
+                                className={`w-full bg-gradient-to-r from-neon-blue to-cyan-500 text-slate-900 font-sans font-bold text-lg py-4 rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-1 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-neon-blue/40'}`}>
                                 {loading ? 'AUTENTICANDO...' : 'INICIALIZAR SESIÓN'}
                             </button>
                         </form>
                     ) : showPayment ? (
                         /* ── Seller Payment ── */
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
                             {error && (
-                                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg font-sans text-sm font-medium animate-pulse text-center">
+                                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg font-sans text-sm font-medium text-center">
                                     {error}
                                 </div>
                             )}
-                            <div className="bg-slate-900/50 border border-neon-blue/50 p-4 rounded-xl text-center">
-                                <p className="text-slate-400 font-sans text-sm mb-1">Costo Mensual de Indentificación:</p>
-                                <p className="text-3xl font-display font-bold text-white">₡{sellerFee}</p>
-                                <p className="text-sm font-retro text-slate-400 tracking-wider mb-2">~ ${(parseFloat(sellerFee) / 500).toFixed(2)} USD</p>
-                                <p className="text-xs text-neon-pink mt-2">* Membresía auto-renovable mensualmente</p>
-                            </div>
-
-                            <div className="space-y-4 max-w-sm mx-auto z-20 relative mt-6">
-                                <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", currency: "USD", intent: "capture" }}>
+                            {selectedPlan && (
+                                <div className="bg-slate-900/50 border border-neon-blue/50 p-4 rounded-xl text-center">
+                                    <p className="text-2xl mb-1">{selectedPlan.emoji}</p>
+                                    <p className="text-lg font-display font-bold text-white">{selectedPlan.name}</p>
+                                    {selectedPlan.isFounder && (
+                                        <span className="text-xs bg-yellow-400/20 text-yellow-400 border border-yellow-400/40 px-2 py-0.5 rounded-full font-bold">
+                                            ⭐ PRECIO FUNDADOR
+                                        </span>
+                                    )}
+                                    <p className="text-3xl font-display font-bold text-neon-blue mt-2">
+                                        ₡{selectedPlan.crcPrice.toLocaleString('es-CR')}
+                                        <span className="text-sm text-slate-400">/mes</span>
+                                    </p>
+                                    <p className="text-sm font-retro text-slate-400">~ ${selectedPlan.usdPrice.toFixed(2)} USD</p>
+                                    <p className="text-xs text-neon-pink mt-1">
+                                        Hasta {selectedPlan.maxProducts === null ? '∞' : selectedPlan.maxProducts} productos activos
+                                    </p>
+                                </div>
+                            )}
+                            <div className="space-y-4 max-w-sm mx-auto z-20 relative">
+                                <PayPalScriptProvider options={{ clientId: paypalClientId, currency: "USD", intent: "capture" }}>
                                     <PayPalButtons
                                         style={{ layout: "vertical", shape: "pill", color: "gold" }}
                                         createOrder={(_data, actions) => {
                                             return actions.order.create({
                                                 intent: "CAPTURE",
-                                                purchase_units: [
-                                                    {
-                                                        description: "Suscripción Instalación Vendedor GeekStore",
-                                                        amount: { value: (parseFloat(sellerFee) / 500).toFixed(2), currency_code: "USD" }
-                                                    }
-                                                ],
+                                                purchase_units: [{
+                                                    description: `Suscripción ${selectedPlan?.name ?? 'Vendedor'} — Goblin Spot`,
+                                                    amount: { value: (selectedPlan?.usdPrice ?? 2.22).toFixed(2), currency_code: "USD" }
+                                                }],
                                             });
                                         }}
                                         onApprove={async (_data, actions) => {
                                             if (!actions.order) return;
                                             try {
-                                                await actions.order.capture();
-                                                await handlePayment();
+                                                const order = await actions.order.capture();
+                                                await handlePaymentCapture(order.id ?? '');
                                             } catch (err) {
                                                 setError(err instanceof Error ? err.message : "Error al procesar el pago con PayPal.");
                                             }
                                         }}
-                                        onError={() => {
-                                            setError("Hubo un error al conectar con PayPal.");
-                                        }}
+                                        onError={() => { setError("Hubo un error al conectar con PayPal."); }}
                                     />
                                 </PayPalScriptProvider>
                             </div>
-
-                            <button
-                                onClick={() => setShowPayment(false)}
-                                disabled={loading}
-                                className="w-full text-slate-400 hover:text-white font-sans text-sm mt-4 tracking-wide"
-                            >
+                            <button onClick={() => setShowPayment(false)} disabled={loading}
+                                className="w-full text-slate-400 hover:text-white font-sans text-sm mt-2 tracking-wide">
                                 CANCELAR REGISTRO
                             </button>
                         </div>
@@ -367,82 +363,82 @@ export default function Login() {
                                         className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all text-xs font-bold ${regRole === 'Seller' ? 'border-neon-pink bg-neon-pink/10 text-neon-pink' : 'border-slate-700 text-slate-400 hover:border-slate-500'}`}>
                                         <span className="text-xl mb-1">⚔</span>
                                         <span>VENDEDOR</span>
-                                        <span className="font-sans font-normal text-neon-pink text-[10px] mt-0.5">₡{sellerFee}/mes</span>
+                                        <span className="font-sans font-normal text-neon-pink text-[10px] mt-0.5">desde ₡{plans[0]?.crcPrice.toLocaleString('es-CR') ?? '...'}/mes</span>
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Plan cards — only shown when Seller is selected */}
+                            {regRole === 'Seller' && plans.length > 0 && (
+                                <div className="space-y-1.5">
+                                    <label className="block text-slate-300 font-sans font-medium text-xs uppercase tracking-wider">ELIGE TU PLAN</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {plans.map(plan => (
+                                            <button
+                                                key={plan.name}
+                                                type="button"
+                                                onClick={() => setSelectedPlan(plan)}
+                                                className={`flex flex-col items-start p-3 rounded-xl border-2 transition-all text-left ${selectedPlan?.name === plan.name ? 'border-neon-pink bg-neon-pink/10' : 'border-slate-700 hover:border-slate-500 bg-slate-900/30'}`}
+                                            >
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <span className="text-base">{plan.emoji}</span>
+                                                    <span className="text-xs font-bold text-white truncate">{plan.name.replace('Goblin ', '')}</span>
+                                                </div>
+                                                <p className="text-neon-blue font-bold text-sm">₡{plan.crcPrice.toLocaleString('es-CR')}</p>
+                                                <p className="text-slate-400 text-[10px]">${plan.usdPrice.toFixed(2)} USD/mes</p>
+                                                <p className="text-slate-500 text-[10px]">
+                                                    {plan.maxProducts === null ? '∞ productos' : `${plan.maxProducts} productos`}
+                                                </p>
+                                                {plan.isFounder && (
+                                                    <span className="text-[9px] bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-bold mt-1">
+                                                        ⭐ FUNDADOR ({plan.founderSlotsLeft} slots)
+                                                    </span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className="block text-slate-300 font-sans font-medium text-sm text-xs">NOMBRE</label>
-                                    <input
-                                        type="text"
-                                        value={regName}
-                                        onChange={(e) => setRegName(e.target.value)}
-                                        required
-                                        className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner"
-                                    />
+                                    <label className="block text-slate-300 font-sans font-medium text-xs">NOMBRE</label>
+                                    <input type="text" value={regName} onChange={(e) => setRegName(e.target.value)} required
+                                        className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="block text-slate-300 font-sans font-medium text-sm text-xs">APELLIDO</label>
-                                    <input
-                                        type="text"
-                                        value={regSurname}
-                                        onChange={(e) => setRegSurname(e.target.value)}
-                                        required
-                                        className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner"
-                                    />
+                                    <label className="block text-slate-300 font-sans font-medium text-xs">APELLIDO</label>
+                                    <input type="text" value={regSurname} onChange={(e) => setRegSurname(e.target.value)} required
+                                        className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner" />
                                 </div>
                             </div>
-
                             <div className="space-y-2">
-                                <label className="block text-slate-300 font-sans font-medium text-sm text-xs">ALIAS DE USUARIO</label>
-                                <input
-                                    type="text"
-                                    value={regNickname}
-                                    onChange={(e) => setRegNickname(e.target.value)}
-                                    required
-                                    className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner"
-                                />
+                                <label className="block text-slate-300 font-sans font-medium text-xs">ALIAS DE USUARIO</label>
+                                <input type="text" value={regNickname} onChange={(e) => setRegNickname(e.target.value)} required
+                                    className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="block text-slate-300 font-sans font-medium text-xs">CORREO DE CONTACTO</label>
+                                <input type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required autoComplete="email"
+                                    className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="block text-slate-300 font-sans font-medium text-xs">CONTRASEÑA</label>
+                                <input type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} required autoComplete="new-password"
+                                    className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner" />
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="block text-slate-300 font-sans font-medium text-sm text-xs">CORREO DE CONTACTO</label>
-                                <input
-                                    type="email"
-                                    value={regEmail}
-                                    onChange={(e) => setRegEmail(e.target.value)}
-                                    required
-                                    autoComplete="email"
-                                    className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="block text-slate-300 font-sans font-medium text-sm text-xs">CONTRASEÑA</label>
-                                <input
-                                    type="password"
-                                    value={regPassword}
-                                    onChange={(e) => setRegPassword(e.target.value)}
-                                    required
-                                    autoComplete="new-password"
-                                    className="w-full bg-slate-900/50 border border-slate-700 focus:border-neon-pink rounded-lg text-white p-2.5 font-sans outline-none transition-colors text-sm shadow-inner"
-                                />
-                            </div>
-
-                            <button
-                                type="submit"
-                                className="w-full mt-6 flex justify-center items-center gap-2 bg-gradient-to-r from-neon-pink to-purple-600 text-white font-sans font-bold text-lg py-3 rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-1 hover:shadow-neon-pink/40"
-                            >
-                                <UserPlus size={20} /> INICIAR REGISTRO ACUERDO
+                            <button type="submit"
+                                className="w-full mt-4 flex justify-center items-center gap-2 bg-gradient-to-r from-neon-pink to-purple-600 text-white font-sans font-bold text-lg py-3 rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-1 hover:shadow-neon-pink/40">
+                                <UserPlus size={20} />
+                                {regRole === 'Seller' ? 'CONTINUAR AL PAGO' : 'CREAR CUENTA'}
                             </button>
                         </form>
                     )}
 
                     <div className="mt-6 text-center">
-                        <button
-                            onClick={() => navigate('/catalog')}
-                            className="text-slate-400 hover:text-white font-sans text-sm transition-colors"
-                        >
+                        <button onClick={() => navigate('/catalog')}
+                            className="text-slate-400 hover:text-white font-sans text-sm transition-colors">
                             &larr; Volver al Catálogo Público
                         </button>
                     </div>

@@ -14,6 +14,7 @@ obj/
 *.log
 .vs/
 appsettings.Development.json
+appsettings.Production.json
 
 # ── Node / Frontend ─────────────────────────
 node_modules/

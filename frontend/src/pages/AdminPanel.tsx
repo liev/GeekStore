@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShieldAlert, ShieldCheck, ArrowUpDown, Save, Layers, Plus, ChevronDown, ChevronRight, BarChart3, BrainCircuit, TrendingUp, Info, Search, Filter, X } from 'lucide-react';
-import { adminApi, settingsApi, categoriesApi, adminDashboardApi, catalogApi, reviewsApi, type User, type Category, type Product, type ReviewSummary, type Review } from '../api/client';
+import { adminApi, settingsApi, categoriesApi, adminDashboardApi, catalogApi, reviewsApi, disputesApi, deliveryPointsApi, type User, type Category, type Product, type ReviewSummary, type Review, type Dispute, type DeliveryPoint, type SubscriptionPlan } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 
@@ -26,7 +26,14 @@ export default function AdminPanel() {
     const [isUpdatingFee, setIsUpdatingFee] = useState(false);
 
     // Categories State
-    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard' | 'productos' | 'reseñas'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard' | 'productos' | 'reseñas' | 'disputas' | 'puntos' | 'planes'>('dashboard');
+
+    // Plans State
+    const [adminPlans, setAdminPlans] = useState<SubscriptionPlan[]>([]);
+    const [loadingPlans, setLoadingPlans] = useState(false);
+    const [editingPlanName, setEditingPlanName] = useState<string | null>(null);
+    const [editingPlanCrc, setEditingPlanCrc] = useState<string>('');
+    const [savingPlan, setSavingPlan] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
@@ -60,6 +67,89 @@ export default function AdminPanel() {
     const [adminReviews, setAdminReviews] = useState<(Review & { sellerId: number; sellerNickname: string })[]>([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
 
+    // Admin Disputes State
+    const [adminDisputes, setAdminDisputes] = useState<(Dispute & { initiator: {id:number,name:string}, target: {id:number,name:string}, orderTotal?: number })[]>([]);
+    const [loadingDisputes, setLoadingDisputes] = useState(false);
+    const [resolvingDisputeId, setResolvingDisputeId] = useState<number | null>(null);
+    const [disputeResolution, setDisputeResolution] = useState('');
+
+    // Delivery Points State
+    const [deliveryPoints, setDeliveryPoints] = useState<DeliveryPoint[]>([]);
+    const [loadingDeliveryPoints, setLoadingDeliveryPoints] = useState(false);
+    const [showAddPointModal, setShowAddPointModal] = useState(false);
+    const [newPointName, setNewPointName] = useState('');
+    const [newPointDescription, setNewPointDescription] = useState('');
+    const [newPointLocationUrl, setNewPointLocationUrl] = useState('');
+    const [isSavingPoint, setIsSavingPoint] = useState(false);
+
+    const fetchAdminDisputes = async () => {
+        if (!token) return;
+        setLoadingDisputes(true);
+        try {
+            const data = await disputesApi.getAllAdmin(token);
+            setAdminDisputes(data);
+        } catch (e) { console.error(e); }
+        finally { setLoadingDisputes(false); }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'disputas' && adminDisputes.length === 0) {
+            fetchAdminDisputes();
+        }
+    }, [activeTab, token]);
+
+    const fetchDeliveryPoints = async () => {
+        setLoadingDeliveryPoints(true);
+        try {
+            const data = await deliveryPointsApi.getAll();
+            setDeliveryPoints(data);
+        } catch (e) { console.error(e); }
+        finally { setLoadingDeliveryPoints(false); }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'puntos' && deliveryPoints.length === 0) {
+            fetchDeliveryPoints();
+        }
+    }, [activeTab, deliveryPoints.length]);
+
+    useEffect(() => {
+        if (activeTab === 'planes' && adminPlans.length === 0) {
+            setLoadingPlans(true);
+            settingsApi.getPlans().then(data => setAdminPlans(data)).finally(() => setLoadingPlans(false));
+        }
+    }, [activeTab, adminPlans.length]);
+
+    const handleAddPoint = async () => {
+        if (!token || !newPointName.trim()) return;
+        setIsSavingPoint(true);
+        try {
+            const created = await deliveryPointsApi.create({
+                name: newPointName,
+                description: newPointDescription,
+                locationUrl: newPointLocationUrl,
+                isActive: true
+            }, token);
+            if (created) {
+                setDeliveryPoints(prev => [...prev, created]);
+                setNewPointName('');
+                setNewPointDescription('');
+                setNewPointLocationUrl('');
+                setShowAddPointModal(false);
+            }
+        } catch (e) { console.error(e); }
+        finally { setIsSavingPoint(false); }
+    };
+
+    const handleDeactivatePoint = async (id: number) => {
+        if (!token) return;
+        if (!window.confirm('¿Desactivar este punto de entrega?')) return;
+        const ok = await deliveryPointsApi.deactivate(id, token);
+        if (ok) {
+            setDeliveryPoints(prev => prev.map(p => p.id === id ? { ...p, isActive: false } : p));
+        }
+    };
+
     const fetchAdminReviews = async () => {
         if (!token) return;
         setLoadingReviews(true);
@@ -77,11 +167,11 @@ export default function AdminPanel() {
         if (activeTab === 'reseñas' && adminReviews.length === 0) {
             fetchAdminReviews();
         }
-    }, [activeTab, token]);
+    }, [activeTab, token, adminReviews.length]);
 
     const handleDeleteReview = async (id: number) => {
         if (!token) return;
-        if (!window.confirm('¿Confiscar esta reseña permanentemente bajo cargos de herejía?')) return;
+        if (!window.confirm('¿Deseas eliminar permanentemente esta reseña por presunto incumplimiento de normas?')) return;
         try {
             await adminApi.deleteReview(id, token);
             setAdminReviews(prev => prev.filter(r => r.id !== id));
@@ -116,7 +206,7 @@ export default function AdminPanel() {
         if (activeTab === 'productos' && catalogProducts.length === 0) {
             fetchCatalog();
         }
-    }, [activeTab]);
+    }, [activeTab, catalogProducts.length]);
 
     useEffect(() => {
         const fetchFee = async () => {
@@ -167,9 +257,10 @@ export default function AdminPanel() {
             const decoded = jwtDecode<JwtPayload>(storedToken);
             const userRole = decoded.role || decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
 
-            // Allow Seller (Admin impersonation) for hackathon demo purposes
-            // In a real app we would check userRole === 'Admin'
-            console.log('User Role:', userRole);
+            if (userRole !== 'Admin') {
+                navigate('/');
+                return;
+            }
             setToken(storedToken);
         } catch {
             localStorage.removeItem('geekstore_token');
@@ -178,20 +269,21 @@ export default function AdminPanel() {
     }, [navigate]);
 
     useEffect(() => {
-        const fetchUsers = async () => {
-            if (!token) return;
-            setLoading(true);
-            try {
-                const fetchedUsers = await adminApi.getUsers(token);
-                setUsers(fetchedUsers);
-            } catch (error) {
-                console.error("Error fetching users", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchUsers();
-    }, [token]);
+        if (activeTab === 'usuarios' && users.length === 0 && token) {
+            const fetchUsers = async () => {
+                setLoading(true);
+                try {
+                    const fetchedUsers = await adminApi.getUsers(token);
+                    setUsers(fetchedUsers);
+                } catch (error) {
+                    console.error("Error fetching users", error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchUsers();
+        }
+    }, [activeTab, token, users.length]);
 
     const handleToggleBan = async (userId: number) => {
         if (!token) return;
@@ -329,7 +421,8 @@ export default function AdminPanel() {
 
     const filteredCatalog = catalogProducts.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(catalogSearch.toLowerCase()) || 
-                              (p.seller?.nickname || p.seller?.name || `id ${p.sellerId}`).toLowerCase().includes(catalogSearch.toLowerCase());
+                              (p.seller?.nickname || p.seller?.name || `id ${p.sellerId}`).toLowerCase().includes(catalogSearch.toLowerCase()) ||
+                              (p.sellerNote || '').toLowerCase().includes(catalogSearch.toLowerCase());
         const matchesCondition = catalogCondition === 'All' || p.condition === catalogCondition;
         let matchesStock = true;
         if (catalogStock === 'Available') matchesStock = p.stockStatus === 'Available' && p.stockCount > 0;
@@ -436,6 +529,33 @@ export default function AdminPanel() {
                             }`}
                     >
                         Reseñas
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('disputas')}
+                        className={`px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'disputas'
+                            ? 'glass-panel text-white shadow-lg shadow-neon-blue/20 border-neon-blue'
+                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                            }`}
+                    >
+                        Disputas
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('puntos')}
+                        className={`px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'puntos'
+                            ? 'glass-panel text-white shadow-lg shadow-neon-yellow/20 border-neon-yellow'
+                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                            }`}
+                    >
+                        Puntos de Entrega
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('planes')}
+                        className={`px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'planes'
+                            ? 'glass-panel text-white shadow-lg shadow-purple-400/20 border-purple-400'
+                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                            }`}
+                    >
+                        💎 Planes
                     </button>
                 </div>
 
@@ -613,7 +733,7 @@ export default function AdminPanel() {
                                         <th className="p-4 font-semibold text-slate-300 text-center cursor-pointer hover:text-neon-blue transition-colors group" onClick={() => handleSort('isActive')}>
                                             <div className="flex items-center justify-center gap-1">Estado <ArrowUpDown size={14} className="opacity-0 group-hover:opacity-100" /></div>
                                         </th>
-                                        <th className="p-4 font-semibold text-slate-300 text-right">Acción Diciplinaria</th>
+                                        <th className="p-4 font-semibold text-slate-300 text-right">Gestión de Cuenta</th>
                                     </tr>
                                 </thead>
                                 <tbody className="font-sans">
@@ -641,7 +761,7 @@ export default function AdminPanel() {
                                                 <td className="p-4 text-center">
                                                     <div className="flex flex-col items-center gap-1">
                                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${user.isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
-                                                            {user.isActive ? 'ACTIVO' : 'BANEADO'}
+                                                            {user.isActive ? 'ACTIVO' : 'SUSPENDIDO'}
                                                         </span>
                                                         {user.role === 'Seller' && user.subscriptionPlan && (
                                                             <span className="text-[10px] text-neon-pink mt-1">{user.subscriptionPlan}</span>
@@ -656,7 +776,7 @@ export default function AdminPanel() {
                                                             : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/50'}`}
                                                     >
                                                         {user.isActive ? (
-                                                            <span className="flex items-center justify-center gap-2"><ShieldAlert size={14} /> BANEAR</span>
+                                                            <span className="flex items-center justify-center gap-2"><ShieldAlert size={14} /> SUSPENDER</span>
                                                         ) : (
                                                             <span className="flex items-center justify-center gap-2"><ShieldCheck size={14} /> REACTIVAR</span>
                                                         )}
@@ -666,6 +786,20 @@ export default function AdminPanel() {
                                                         className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all w-32 bg-yellow-400/20 text-yellow-400 hover:bg-yellow-400 hover:text-slate-900 border border-yellow-400/50 flex items-center justify-center gap-2"
                                                     >
                                                         {user.role === 'Seller' ? 'EDITAR PLAN' : 'ASIGNAR PLAN'}
+                                                    </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!token) return;
+                                                            if (!window.confirm(`¿Cierrer permanente de cuenta para ${user.nickname || user.name}? Esta acción ocultará todos sus productos y desactivará su acceso definitivamente.`)) return;
+                                                            const success = await adminApi.deleteUser(user.id, token);
+                                                            if (success) {
+                                                                setUsers(users.map(u => u.id === user.id ? { ...u, isActive: false, subscriptionPlan: 'Permanently Closed' } : u));
+                                                                alert("Cuenta cerrada permanentemente.");
+                                                            }
+                                                        }}
+                                                        className="px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all w-32 bg-red-900/40 text-red-500 hover:bg-red-600 hover:text-white border border-red-500/30 flex items-center justify-center gap-1 opacity-40 hover:opacity-100"
+                                                    >
+                                                        CIERRE DEFINITIVO
                                                     </button>
                                                 </td>
                                             </tr>
@@ -732,9 +866,10 @@ export default function AdminPanel() {
                                             <th className="p-4 font-semibold text-slate-300">ID</th>
                                             <th className="p-4 font-semibold text-slate-300">Producto</th>
                                             <th className="p-4 font-semibold text-slate-300">Vendedor</th>
+                                            <th className="p-4 font-semibold text-slate-300">Nota</th>
                                             <th className="p-4 font-semibold text-slate-300 text-center">Rating</th>
                                             <th className="p-4 font-semibold text-slate-300 text-center">Stock</th>
-                                            <th className="p-4 font-semibold text-slate-300 text-right">Inquisición</th>
+                                            <th className="p-4 font-semibold text-slate-300 text-right">Moderación</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -748,6 +883,7 @@ export default function AdminPanel() {
                                                     <td className="p-4 font-retro text-slate-400 text-sm">{String(p.id).padStart(3, '0')}</td>
                                                     <td className="p-4 text-white font-bold">{p.name}</td>
                                                     <td className="p-4 text-slate-400">{p.seller?.nickname || p.seller?.name || `ID ${p.sellerId}`}</td>
+                                                    <td className="p-4 text-slate-500 text-xs italic truncate max-w-[150px]">{p.sellerNote || '—'}</td>
                                                     <td className="p-4 text-center">
                                                         {sellerRatings[p.sellerId] && sellerRatings[p.sellerId].reviewCount > 0 ? (
                                                             <div className="flex items-center justify-center gap-1 text-yellow-500">
@@ -790,14 +926,14 @@ export default function AdminPanel() {
                                         <th className="p-4 font-semibold text-slate-300">Vendedor</th>
                                         <th className="p-4 font-semibold text-slate-300 text-center">Rating</th>
                                         <th className="p-4 font-semibold text-slate-300 w-1/3">Comentario</th>
-                                        <th className="p-4 font-semibold text-slate-300 text-right">Inquisición</th>
+                                        <th className="p-4 font-semibold text-slate-300 text-right">Moderación</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loadingReviews ? (
-                                         <tr><td colSpan={6} className="p-8 text-center text-yellow-500 font-retro animate-pulse">CARGANDO REGISTROS DE HEREJÍA...</td></tr>
+                                         <tr><td colSpan={6} className="p-8 text-center text-yellow-500 font-retro animate-pulse">CARGANDO REGISTROS...</td></tr>
                                     ) : adminReviews.length === 0 ? (
-                                         <tr><td colSpan={6} className="p-8 text-center text-slate-500 font-sans">No hay reseñas registradas en el reino.</td></tr>
+                                         <tr><td colSpan={6} className="p-8 text-center text-slate-500 font-sans">No hay reseñas registradas en el sistema.</td></tr>
                                     ) : (
                                         adminReviews.map(r => (
                                             <tr key={r.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors group">
@@ -813,7 +949,7 @@ export default function AdminPanel() {
                                                         onClick={() => handleDeleteReview(r.id)}
                                                         className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/50"
                                                     >
-                                                        CENSURAR
+                                                        ELIMINAR
                                                     </button>
                                                 </td>
                                             </tr>
@@ -821,6 +957,297 @@ export default function AdminPanel() {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+                    )}
+
+                    {activeTab === 'disputas' && (
+                        <div className="relative z-10 w-full animate-in fade-in duration-300">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-white font-retro">Gestión de Disputas</h2>
+                                <button onClick={fetchAdminDisputes} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all">
+                                    Actualizar
+                                </button>
+                            </div>
+                            {loadingDisputes ? (
+                                <div className="p-8 text-center text-yellow-500 font-retro animate-pulse">CARGANDO DISPUTAS...</div>
+                            ) : adminDisputes.length === 0 ? (
+                                <div className="p-8 text-center text-slate-500 font-sans">No hay disputas registradas.</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-700">
+                                                <th className="p-4 font-semibold text-slate-300 text-left">#</th>
+                                                <th className="p-4 font-semibold text-slate-300 text-left">Orden</th>
+                                                <th className="p-4 font-semibold text-slate-300">Iniciador</th>
+                                                <th className="p-4 font-semibold text-slate-300">Afectado</th>
+                                                <th className="p-4 font-semibold text-slate-300 w-1/3">Razón</th>
+                                                <th className="p-4 font-semibold text-slate-300 text-center">Status</th>
+                                                <th className="p-4 font-semibold text-slate-300 text-right">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {adminDisputes.map(d => (
+                                                <tr key={d.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors">
+                                                    <td className="p-4 text-slate-400 font-mono text-xs">{d.id}</td>
+                                                    <td className="p-4 text-slate-300">
+                                                        <div className="font-semibold">Orden #{d.orderId}</div>
+                                                        {d.orderTotal && <div className="text-xs text-slate-500">₡{d.orderTotal.toLocaleString()}</div>}
+                                                    </td>
+                                                    <td className="p-4 text-slate-300 text-center">{d.initiator.name}</td>
+                                                    <td className="p-4 text-slate-300 text-center">{d.target.name}</td>
+                                                    <td className="p-4 text-slate-400 text-xs">{d.reason}</td>
+                                                    <td className="p-4 text-center">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${d.status === 'Open' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
+                                                            {d.status === 'Open' ? 'ABIERTA' : 'RESUELTA'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-right">
+                                                        {d.status === 'Open' && (
+                                                            <button
+                                                                onClick={() => { setResolvingDisputeId(d.id); setDisputeResolution(''); }}
+                                                                className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-neon-blue/20 text-neon-blue hover:bg-neon-blue hover:text-white border border-neon-blue/50"
+                                                            >
+                                                                Resolver
+                                                            </button>
+                                                        )}
+                                                        {d.status === 'Resolved' && d.adminResolution && (
+                                                            <span className="text-xs text-slate-500 italic">{d.adminResolution.substring(0, 30)}...</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                            {/* Modal de resolución */}
+                            {resolvingDisputeId !== null && (
+                                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                                    <div className="bg-slate-900 rounded-2xl p-6 w-full max-w-md border border-slate-700">
+                                        <h3 className="text-lg font-bold text-white mb-4">Resolver Disputa #{resolvingDisputeId}</h3>
+                                        <textarea
+                                            value={disputeResolution}
+                                            onChange={e => setDisputeResolution(e.target.value)}
+                                            placeholder="Describe la resolución y próximos pasos para ambas partes..."
+                                            className="w-full h-32 bg-slate-800 text-white rounded-xl p-3 text-sm resize-none border border-slate-600 focus:border-neon-blue focus:outline-none mb-4"
+                                        />
+                                        <div className="flex gap-3">
+                                            <button onClick={() => setResolvingDisputeId(null)} className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all">
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                disabled={!disputeResolution.trim()}
+                                                onClick={async () => {
+                                                    if (!token || !disputeResolution.trim()) return;
+                                                    try {
+                                                        await disputesApi.resolveAdmin(resolvingDisputeId, disputeResolution, token);
+                                                        setAdminDisputes(prev => prev.map(d => d.id === resolvingDisputeId ? { ...d, status: 'Resolved', adminResolution: disputeResolution } : d));
+                                                        setResolvingDisputeId(null);
+                                                    } catch (e) { alert('Error al resolver la disputa.'); }
+                                                }}
+                                                className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-neon-blue text-white hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Confirmar Resolución
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'puntos' && (
+                        <div className="relative z-10 w-full animate-in fade-in duration-300">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-white font-retro">Puntos de Entrega</h2>
+                                <div className="flex gap-2">
+                                    <button onClick={fetchDeliveryPoints} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all">
+                                        Actualizar
+                                    </button>
+                                    <button onClick={() => setShowAddPointModal(true)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neon-yellow/20 text-neon-yellow hover:bg-neon-yellow hover:text-slate-900 border border-neon-yellow/50 transition-all flex items-center gap-1">
+                                        <Plus size={14} /> Agregar Punto
+                                    </button>
+                                </div>
+                            </div>
+                            {loadingDeliveryPoints ? (
+                                <div className="p-8 text-center text-neon-yellow font-retro animate-pulse">CARGANDO PUNTOS...</div>
+                            ) : deliveryPoints.length === 0 ? (
+                                <div className="p-8 text-center text-slate-500 font-sans border-2 border-dashed border-slate-800 rounded-xl">No hay puntos de entrega registrados.</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-700">
+                                                <th className="p-4 font-semibold text-slate-300 text-left">Nombre</th>
+                                                <th className="p-4 font-semibold text-slate-300 text-left">Descripción</th>
+                                                <th className="p-4 font-semibold text-slate-300 text-center">Estado</th>
+                                                <th className="p-4 font-semibold text-slate-300 text-right">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {deliveryPoints.map(pt => (
+                                                <tr key={pt.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors">
+                                                    <td className="p-4 text-white font-medium">{pt.name}</td>
+                                                    <td className="p-4 text-slate-400 text-xs">{pt.description || '—'}</td>
+                                                    <td className="p-4 text-center">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${pt.isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                                                            {pt.isActive ? 'ACTIVO' : 'INACTIVO'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-right">
+                                                        {pt.isActive && (
+                                                            <button
+                                                                onClick={() => handleDeactivatePoint(pt.id)}
+                                                                className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/30"
+                                                            >
+                                                                Desactivar
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                            {/* Add Point Modal */}
+                            {showAddPointModal && (
+                                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                                    <div className="bg-slate-900 rounded-2xl p-6 w-full max-w-md border border-slate-700">
+                                        <h3 className="text-lg font-bold text-white mb-4 font-retro">Nuevo Punto de Entrega</h3>
+                                        <div className="space-y-3 mb-4">
+                                            <div>
+                                                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Nombre *</label>
+                                                <input
+                                                    value={newPointName}
+                                                    onChange={e => setNewPointName(e.target.value)}
+                                                    placeholder="Tienda Fenix, Vortex..."
+                                                    className="w-full bg-slate-800 text-white rounded-xl p-3 text-sm border border-slate-600 focus:border-neon-yellow focus:outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Descripción</label>
+                                                <input
+                                                    value={newPointDescription}
+                                                    onChange={e => setNewPointDescription(e.target.value)}
+                                                    placeholder="Dirección o referencia del lugar"
+                                                    className="w-full bg-slate-800 text-white rounded-xl p-3 text-sm border border-slate-600 focus:border-neon-yellow focus:outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">URL de Ubicación</label>
+                                                <input
+                                                    value={newPointLocationUrl}
+                                                    onChange={e => setNewPointLocationUrl(e.target.value)}
+                                                    placeholder="https://maps.google.com/..."
+                                                    className="w-full bg-slate-800 text-white rounded-xl p-3 text-sm border border-slate-600 focus:border-neon-yellow focus:outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button onClick={() => setShowAddPointModal(false)} className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all">
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                disabled={!newPointName.trim() || isSavingPoint}
+                                                onClick={handleAddPoint}
+                                                className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-neon-yellow text-slate-900 hover:bg-yellow-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {isSavingPoint ? 'Guardando...' : 'Guardar'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'planes' && (
+                        <div className="relative z-10 w-full animate-in fade-in duration-300">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-white font-retro">💎 Precios de Planes</h2>
+                                <button
+                                    onClick={() => {
+                                        setLoadingPlans(true);
+                                        settingsApi.getPlans().then(data => setAdminPlans(data)).finally(() => setLoadingPlans(false));
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all"
+                                >
+                                    Actualizar
+                                </button>
+                            </div>
+                            <p className="text-slate-400 text-sm font-sans mb-6">
+                                Modifica los precios en CRC. El tipo de cambio a USD se calcula automáticamente (÷450).
+                            </p>
+                            {loadingPlans ? (
+                                <div className="p-8 text-center text-purple-400 font-retro animate-pulse">CARGANDO PLANES...</div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {adminPlans.map(plan => (
+                                        <div key={plan.name} className="glass-panel p-5 rounded-xl border border-slate-700/50 space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-2xl">{plan.emoji}</span>
+                                                <div>
+                                                    <p className="text-white font-bold text-sm">{plan.name}</p>
+                                                    <p className="text-slate-500 text-xs">
+                                                        {plan.maxProducts === null ? '∞ productos' : `${plan.maxProducts} productos`}
+                                                        {plan.isFounder && <span className="text-yellow-400 ml-2">⭐ {plan.founderSlotsLeft} slots fundador</span>}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span className="text-slate-400">Precio actual:</span>
+                                                <span className="text-neon-blue font-bold">₡{plan.crcPrice.toLocaleString('es-CR')}</span>
+                                                <span className="text-slate-500">· ${plan.usdPrice.toFixed(2)} USD</span>
+                                            </div>
+                                            {editingPlanName === plan.name ? (
+                                                <div className="flex gap-2 items-center">
+                                                    <span className="text-slate-400 text-sm">₡</span>
+                                                    <input
+                                                        type="number"
+                                                        value={editingPlanCrc}
+                                                        onChange={e => setEditingPlanCrc(e.target.value)}
+                                                        className="flex-1 bg-slate-900 border border-purple-400/50 focus:border-purple-400 rounded-lg text-white p-2 text-sm font-sans outline-none"
+                                                        placeholder="Nuevo precio CRC"
+                                                    />
+                                                    <button
+                                                        disabled={savingPlan || !editingPlanCrc}
+                                                        onClick={async () => {
+                                                            if (!token || !editingPlanCrc) return;
+                                                            setSavingPlan(true);
+                                                            const ok = await settingsApi.updatePlanPrice(plan.name, parseFloat(editingPlanCrc), token);
+                                                            if (ok) {
+                                                                setAdminPlans(prev => prev.map(p => p.name === plan.name
+                                                                    ? { ...p, crcPrice: parseFloat(editingPlanCrc), usdPrice: parseFloat((parseFloat(editingPlanCrc) / 450).toFixed(2)) }
+                                                                    : p));
+                                                                setEditingPlanName(null);
+                                                            }
+                                                            setSavingPlan(false);
+                                                        }}
+                                                        className="px-3 py-2 rounded-lg text-xs font-bold bg-purple-500/20 text-purple-400 hover:bg-purple-500 hover:text-white border border-purple-500/30 transition-all disabled:opacity-50"
+                                                    >
+                                                        {savingPlan ? '...' : <Save size={14} />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setEditingPlanName(null)}
+                                                        className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => { setEditingPlanName(plan.name); setEditingPlanCrc(plan.crcPrice.toString()); }}
+                                                    className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-slate-700/50 text-slate-300 hover:bg-purple-500/20 hover:text-purple-400 border border-slate-600 hover:border-purple-500/40 transition-all"
+                                                >
+                                                    Editar Precio
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -932,6 +1359,15 @@ export default function AdminPanel() {
                                     </div>
 
                                     <div>
+                                        <h4 className="text-xs font-retro text-slate-500 uppercase tracking-widest mb-1 mt-2">Detalles del Vendedor (Notas)</h4>
+                                        <div className="bg-neon-blue/5 p-4 rounded-xl border border-neon-blue/20">
+                                            <p className="text-sm text-neon-blue font-sans italic">
+                                                {selectedProduct.sellerNote || "Sin notas adicionales del vendedor."}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div>
                                         <h4 className="text-xs font-retro text-slate-500 uppercase tracking-widest mb-1 mt-2">Descripción Completa</h4>
                                         <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700">
                                             <p className="text-sm text-slate-300 font-sans leading-relaxed whitespace-pre-wrap">{selectedProduct.description}</p>
@@ -957,24 +1393,24 @@ export default function AdminPanel() {
                             <button 
                                 onClick={async () => {
                                     if (!token) return;
-                                    const reason = prompt("Motivo de la moderación (Inquisición Goblin):", "Incumplimiento de normas de publicación");
+                                    const reason = prompt("Motivo de la moderación:", "Incumplimiento de normas de publicación");
                                     if (!reason) return;
                                     try {
                                         const success = await adminApi.moderateProduct(selectedProduct.id, reason, token);
                                         if(success) {
                                             setCatalogProducts(catalogProducts.filter(cp => cp.id !== selectedProduct.id));
                                             setSelectedProduct(null);
-                                            alert("Producto censurado. Notificación enviada al vendedor.");
+                                            alert("Producto eliminado por moderación. Notificación enviada al vendedor.");
                                         } else {
                                             alert("Error en la solicitud.");
                                         }
                                     } catch(e) {
-                                        alert("Error de censura");
+                                        alert("Error al eliminar producto");
                                     }
                                 }}
                                 className="w-full px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/50 flex flex-col items-center gap-1 group"
                             >
-                                <span className="uppercase tracking-widest font-retro text-[10px]">Censurar</span>
+                                <span className="uppercase tracking-widest font-retro text-[10px]">Eliminar</span>
                                 <span className="text-xs font-sans group-hover:text-white/80 line-clamp-1">Borrar Producto</span>
                             </button>
                             
@@ -1010,7 +1446,7 @@ export default function AdminPanel() {
                                                 setCatalogProducts(catalogProducts.filter(cp => cp.sellerId !== selectedProduct.sellerId));
                                                 setUsers(users.map(u => u.id === selectedProduct.sellerId ? { ...u, isActive: false } : u));
                                                 setSelectedProduct(null);
-                                                alert("Vendedor expulsado y catálogo purgado.");
+                                                alert("Vendedor suspendido y catálogo desactivado.");
                                             }
                                         } catch(e) {
                                             alert("Error al bloquear vendedor.");
@@ -1019,8 +1455,8 @@ export default function AdminPanel() {
                                 }}
                                 className="w-full px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-purple-500/10 text-purple-400 hover:bg-purple-500 hover:text-white border border-purple-500/50 flex flex-col items-center gap-1 group"
                             >
-                                <span className="uppercase tracking-widest font-retro text-[10px]">Excomunión</span>
-                                <span className="text-xs font-sans group-hover:text-white/80 line-clamp-1">Banear Vendedor</span>
+                                <span className="uppercase tracking-widest font-retro text-[10px]">Bloquear Cuenta</span>
+                                <span className="text-xs font-sans group-hover:text-white/80 line-clamp-1">Suspender Vendedor</span>
                             </button>
                         </div>
                     </div>

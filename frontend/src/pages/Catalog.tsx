@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ShoppingCart, User, SlidersHorizontal, ChevronDown, X, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { catalogApi, categoriesApi, ordersApi, reviewsApi, type Product, type Category as ApiCategory, type OrderSellerInfo, type ReviewSummary } from '../api/client';
+import { catalogApi, categoriesApi, ordersApi, deliveryPointsApi, reviewsApi, type Product, type Category as ApiCategory, type OrderSellerInfo, type ReviewSummary, type DeliveryPoint } from '../api/client';
 import { StarRatingCompact } from './Profile';
 import NotificationBell from '../components/NotificationBell';
 export interface CartItem {
@@ -146,6 +146,8 @@ export default function Catalog() {
     const [buyerEmail, setBuyerEmail] = useState('');
     const [buyerPhone, setBuyerPhone] = useState('');
     const [buyerAddress, setBuyerAddress] = useState('');
+    const [deliveryPoints, setDeliveryPoints] = useState<DeliveryPoint[]>([]);
+    const [selectedDeliveryPointId, setSelectedDeliveryPointId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [sellerFilter, setSellerFilter] = useState<Set<string>>(new Set());
@@ -285,9 +287,15 @@ export default function Catalog() {
         setShowCheckout(true);
     };
 
+    useEffect(() => {
+        if (showCheckout) {
+            deliveryPointsApi.getAll().then(pts => setDeliveryPoints(pts.filter(p => p.isActive)));
+        }
+    }, [showCheckout]);
+
     const handlePlaceOrder = async () => {
         if (!buyerName.trim() || !buyerEmail.trim()) return;
-        
+
         const token = localStorage.getItem('geekstore_token');
         if (!token) {
             navigate('/login');
@@ -297,6 +305,7 @@ export default function Catalog() {
         try {
             const result = await ordersApi.createOrder({
                 deliveryMethod: buyerAddress ? 'Shipping' : 'Pickup',
+                deliveryPointId: selectedDeliveryPointId ?? undefined,
                 shippingAddress: buyerAddress,
                 buyerPhone: buyerPhone,
                 items: cart.map(c => ({
@@ -347,6 +356,11 @@ export default function Catalog() {
         }
         return 0;
     });
+
+    // Apply seller filter client-side (filters within current page)
+    const filteredProducts = sellerFilter.size > 0
+        ? sortedProducts.filter(p => p.seller?.nickname && sellerFilter.has(p.seller.nickname))
+        : sortedProducts;
 
     // Root categories for pills
     const rootCategories = categories.filter(c => !c.parentId);
@@ -578,7 +592,7 @@ export default function Catalog() {
                             </div>
                         )}
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pb-6">
-                            {sortedProducts.length === 0 ? (
+                            {filteredProducts.length === 0 ? (
                                 <div className="col-span-full py-12 text-center text-slate-500 font-sans flex flex-col items-center gap-4 bg-slate-900/50 rounded-xl border border-slate-800 border-dashed">
                                     {activeCategory === 'following' ? (
                                         <>
@@ -599,7 +613,7 @@ export default function Catalog() {
                                         </>
                                     )}
                                 </div>
-                            ) : sortedProducts.map(product => (
+                            ) : filteredProducts.map(product => (
                                 <ProductCard
                                     key={product.id}
                                     product={product}
@@ -702,6 +716,7 @@ export default function Catalog() {
                                         setIsCartOpen(false);
                                         setOrderSellers([]);
                                         setBuyerName(''); setBuyerEmail(''); setBuyerPhone(''); setBuyerAddress('');
+                                        setSelectedDeliveryPointId(null);
                                     }}
                                     className="text-slate-500 hover:text-white text-sm font-sans transition-colors"
                                 >
@@ -742,6 +757,21 @@ export default function Catalog() {
                                             className="w-full bg-slate-900 border border-slate-700 rounded-lg text-white p-3 text-sm focus:outline-none focus:border-neon-blue transition-colors"
                                             placeholder="San José, Escazú" />
                                     </div>
+                                    {!buyerAddress && deliveryPoints.length > 0 && (
+                                        <div>
+                                            <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Punto de retiro</label>
+                                            <select
+                                                value={selectedDeliveryPointId ?? ''}
+                                                onChange={e => setSelectedDeliveryPointId(e.target.value ? Number(e.target.value) : null)}
+                                                className="w-full bg-slate-900 border border-slate-700 rounded-lg text-white p-3 text-sm focus:outline-none focus:border-neon-blue transition-colors"
+                                            >
+                                                <option value="">— Seleccionar punto de retiro —</option>
+                                                {deliveryPoints.map(pt => (
+                                                    <option key={pt.id} value={pt.id}>{pt.name}{pt.description ? ` — ${pt.description}` : ''}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Order summary mini */}

@@ -150,12 +150,8 @@ export default function Profile() {
         setReviewSubmitting(true);
         setReviewMessage('');
         try {
-            const result = await reviewsApi.createReview({
-                sellerId: Number(id),
-                rating: reviewRating,
-                comment: reviewComment
-            }, token);
-            setReviewMessage(result.message);
+            const ok = await reviewsApi.createReview(Number(id), reviewRating, reviewComment, token);
+            setReviewMessage(ok ? '¡Reseña enviada exitosamente!' : 'Error al enviar la reseña.');
 
             // Refresh reviews and summary
             const [updatedReviews, updatedSummary] = await Promise.all([

@@ -5,9 +5,11 @@ using GeekStore.Infrastructure.Data;
 using GeekStore.Infrastructure.Repositories;
 using GeekStore.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,7 +24,7 @@ builder.Services.AddControllers()
     });
 
 // Configure JWT Authentication
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "ThisIsASecretKeyForJWTTokenGenerationEnsureItIsAtLeast32BytesLong!";
+var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key must be configured. Set it in appsettings or environment variables.");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "GeekStoreApi";
 builder.Services.AddAuthentication(options =>
 {
@@ -43,16 +45,39 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// Configure CORS — origins read from configuration, fallback to localhost:5173
+var allowedOriginsRaw = builder.Configuration["AllowedOrigins"];
+var allowedOrigins = string.IsNullOrWhiteSpace(allowedOriginsRaw)
+    ? new[] { "http://localhost:5173" }
+    : allowedOriginsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+            policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .AllowCredentials();
         });
 });
+
+// Configure Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("auth", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 5;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
+    });
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
+// Health Checks
+builder.Services.AddHealthChecks();
 
 // DI - Database (PostgreSQL)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -68,6 +93,7 @@ builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IUserFollowRepository, UserFollowRepository>();
 builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<IDeliveryPointRepository, DeliveryPointRepository>();
 
 // DI - Business Services
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -76,9 +102,11 @@ builder.Services.AddScoped<IImageValidationService, GeminiVisionService>();
 builder.Services.AddScoped<ISellerAnalysisService, GeminiSellerAnalysisService>();
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IMoxfieldService, MoxfieldService>();
+builder.Services.AddScoped<GeekStore.Core.Interfaces.IPayPalService, GeekStore.Infrastructure.Services.PayPalService>();
 builder.Services.AddHttpClient<GeminiVisionService>();
 builder.Services.AddHttpClient<GeminiSellerAnalysisService>();
 builder.Services.AddHttpClient<MoxfieldService>();
+builder.Services.AddHttpClient<GeekStore.Infrastructure.Services.PayPalService>();
 
 // Background Workers
 builder.Services.AddHostedService<GeekStore.Api.Services.SubscriptionWorker>();
@@ -96,9 +124,13 @@ app.UseHttpsRedirection();
 
 app.UseCors("AllowFrontend");
 
+app.UseRateLimiter();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHealthChecks("/health");
 
 app.Run();

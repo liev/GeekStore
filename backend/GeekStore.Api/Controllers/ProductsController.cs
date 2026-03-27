@@ -1,12 +1,15 @@
+using GeekStore.Core.Constants;
 using GeekStore.Core.Entities;
 using GeekStore.Core.Interfaces;
 using GeekStore.Core.Models;
+using GeekStore.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using System.IO;
+using System.Linq;
 using System.Security.Claims;
 using GeekStore.Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -22,17 +25,45 @@ namespace GeekStore.Api.Controllers
         private readonly ICloudinaryService _cloudinaryService;
         private readonly IImageValidationService _imageValidationService;
         private readonly IMoxfieldService _moxfieldService;
+        private readonly GeekStoreDbContext _context;
 
         public ProductsController(
             IProductRepository productRepository,
             ICloudinaryService cloudinaryService,
             IImageValidationService imageValidationService,
-            IMoxfieldService moxfieldService)
+            IMoxfieldService moxfieldService,
+            GeekStoreDbContext context)
         {
             _productRepository = productRepository;
             _cloudinaryService = cloudinaryService;
             _imageValidationService = imageValidationService;
             _moxfieldService = moxfieldService;
+            _context = context;
+        }
+
+        /// <summary>Returns the plan limit and current active product count for the calling seller.</summary>
+        [Authorize]
+        [HttpGet("my-limit")]
+        public async Task<IActionResult> GetMyLimit()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdClaim == null || !int.TryParse(userIdClaim, out var sellerId))
+                return Unauthorized();
+
+            var seller = await _context.Users.FindAsync(sellerId);
+            if (seller == null) return NotFound();
+
+            var maxProducts = GetPlanLimit(seller.SubscriptionPlan);
+            var activeCount = await _context.Products
+                .CountAsync(p => p.SellerId == sellerId && p.IsActive && p.StockStatus == "Available");
+
+            return Ok(new
+            {
+                plan = seller.SubscriptionPlan,
+                maxProducts = maxProducts == int.MaxValue ? (int?)null : maxProducts,
+                activeCount,
+                slotsLeft = maxProducts == int.MaxValue ? (int?)null : Math.Max(0, maxProducts - activeCount)
+            });
         }
 
         [HttpGet]
@@ -42,6 +73,7 @@ namespace GeekStore.Api.Controllers
             return Ok(pagedProducts);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpGet("debug-latest")]
         public async Task<IActionResult> GetDebugLatestProducts()
         {
@@ -89,12 +121,31 @@ namespace GeekStore.Api.Controllers
 
             product.SellerId = sellerId;
 
+            // Enforce plan product limit
+            var seller = await _context.Users.FindAsync(sellerId);
+            if (seller != null)
+            {
+                var maxProducts = GetPlanLimit(seller.SubscriptionPlan);
+                if (maxProducts < int.MaxValue)
+                {
+                    var activeCount = await _context.Products
+                        .CountAsync(p => p.SellerId == sellerId && p.IsActive && p.StockStatus == "Available");
+                    if (activeCount >= maxProducts)
+                        return BadRequest(new { message = $"Límite de tu plan alcanzado ({maxProducts} productos activos). Mejora tu plan para publicar más." });
+                }
+            }
+
             if (product.Description != null && product.Description.ToLower().Contains("fake"))
                 return BadRequest(new { message = "AI MODERATION: El artículo ha sido marcado como inapropiado y fue rechazado." });
 
             var created = await _productRepository.AddAsync(product);
             return CreatedAtAction(nameof(GetProduct), new { id = created.Id }, created);
         }
+
+        private static int GetPlanLimit(string? plan) =>
+            plan != null && SubscriptionPlans.Catalog.TryGetValue(plan, out var info)
+                ? info.MaxProducts
+                : 20; // Default to Worker limit if plan unknown
 
         [Authorize]
         [HttpPut("{id}")]
@@ -122,6 +173,26 @@ namespace GeekStore.Api.Controllers
             if (!string.IsNullOrEmpty(productUpdate.ImageUrl3)) existingProduct.ImageUrl3 = productUpdate.ImageUrl3;
 
             await _productRepository.UpdateAsync(existingProduct);
+            return NoContent();
+        }
+
+        [Authorize]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteProduct(int id)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdClaim == null || !int.TryParse(userIdClaim, out var sellerId))
+                return Unauthorized(new { message = "No autorizado." });
+
+            var product = await _productRepository.GetByIdAsync(id);
+            if (product == null) return NotFound();
+
+            if (product.SellerId != sellerId)
+                return Forbid();
+
+            product.IsActive = false;
+            product.StockStatus = "Unavailable";
+            await _productRepository.UpdateAsync(product);
             return NoContent();
         }
 
@@ -158,9 +229,14 @@ namespace GeekStore.Api.Controllers
             return CreatedAtAction(nameof(GetProduct), new { id = created.Id }, created);
         }
 
+        [Authorize]
         [HttpPost("import-moxfield/{publicId}")]
         public async Task<IActionResult> ImportMoxfieldDeck(string publicId, [FromBody] MoxfieldImportRequest request)
         {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdClaim == null || !int.TryParse(userIdClaim, out var sellerId))
+                return Unauthorized(new { message = "No autorizado." });
+
             var deck = await _moxfieldService.GetDeckByPublicIdAsync(publicId);
             if (deck == null) return NotFound(new { message = "Mazo no encontrado en Moxfield." });
             
@@ -179,7 +255,7 @@ namespace GeekStore.Api.Controllers
                         Description = $"Carta individual de mazo Moxfield: {deck.Name}",
                         CategoryId = 1, // TCG
                         PriceCRC = 0,
-                        SellerId = request.SellerId,
+                        SellerId = sellerId,
                         StockStatus = "Available",
                         StockCount = cardDto.Quantity,
                         ImageUrl = cardDto.Card.ImageUrl
@@ -209,7 +285,7 @@ namespace GeekStore.Api.Controllers
                     Description = description,
                     CategoryId = 1, // 1 = TCG
                     PriceCRC = 0, // Placeholder
-                    SellerId = request.SellerId,
+                    SellerId = sellerId,
                     StockStatus = "Available",
                     StockCount = 1,
                     ImageUrl = deck.Mainboard.Values.FirstOrDefault()?.Card.ImageUrl ?? ""

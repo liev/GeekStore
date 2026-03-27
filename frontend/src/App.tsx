@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import MyPurchases from './pages/MyPurchases';
 import Profile from './pages/Profile';
+import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function Home() {
   const navigate = useNavigate();
@@ -56,15 +58,17 @@ function Home() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/catalog" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Catalog /></div>} />
-      <Route path="/my-purchases" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><MyPurchases /></div>} />
-      <Route path="/profile/:id" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Profile /></div>} />
-      <Route path="/dashboard" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Dashboard /></div>} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/admin" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><AdminPanel /></div>} />
-    </Routes>
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/catalog" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Catalog /></div>} />
+        <Route path="/my-purchases" element={<ProtectedRoute><div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><MyPurchases /></div></ProtectedRoute>} />
+        <Route path="/profile/:id" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Profile /></div>} />
+        <Route path="/dashboard" element={<ProtectedRoute><div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Dashboard /></div></ProtectedRoute>} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/admin" element={<ProtectedRoute requiredRole="Admin"><div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><AdminPanel /></div></ProtectedRoute>} />
+      </Routes>
+    </ErrorBoundary>
   );
 }
 
