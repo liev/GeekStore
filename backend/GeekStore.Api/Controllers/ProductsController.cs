@@ -5,6 +5,7 @@ using GeekStore.Core.Models;
 using GeekStore.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -351,6 +352,45 @@ namespace GeekStore.Api.Controllers
                 count++;
             }
             return Ok(new { message = $"Updated {count} products" });
+        }
+
+        public class ReportProductRequest
+        {
+            public string ReasonCategory { get; set; } = string.Empty; // Spam | Fake | Inappropriate | Counterfeit | Other
+            public string? Details { get; set; }
+        }
+
+        [Authorize]
+        [HttpPost("{id}/report")]
+        public async Task<IActionResult> ReportProduct(int id, [FromBody] ReportProductRequest request)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out int userId)) return Unauthorized();
+
+            var product = await _context.Products.FindAsync(id);
+            if (product == null) return NotFound(new { message = "Producto no encontrado." });
+
+            var validReasons = new[] { "Spam", "Fake", "Inappropriate", "Counterfeit", "Other" };
+            if (!validReasons.Contains(request.ReasonCategory))
+                return BadRequest(new { message = "Categoría de reporte inválida." });
+
+            var existing = await _context.ProductReports
+                .FirstOrDefaultAsync(r => r.ReporterUserId == userId && r.ProductId == id);
+            if (existing != null)
+                return Conflict(new { message = "Ya reportaste este producto anteriormente." });
+
+            _context.ProductReports.Add(new ProductReport
+            {
+                ProductId = id,
+                ReporterUserId = userId,
+                ReasonCategory = request.ReasonCategory,
+                Details = request.Details,
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Reporte enviado. El equipo de moderación lo revisará pronto." });
         }
     }
 }

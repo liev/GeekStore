@@ -1064,3 +1064,60 @@ export const refundsApi = {
         } catch { return false; }
     }
 };
+
+export interface ProductReport {
+    id: number;
+    productId: number;
+    productName: string;
+    productIsActive: boolean;
+    reporterUserId: number;
+    reporterNickname: string;
+    reasonCategory: string; // Spam | Fake | Inappropriate | Counterfeit | Other
+    details?: string | null;
+    status: string; // Pending | Reviewed | Dismissed
+    createdAt: string;
+    reviewedAt?: string | null;
+    adminNotes?: string | null;
+}
+
+export const reportsApi = {
+    report: async (productId: number, reasonCategory: string, details: string | undefined, token: string): Promise<{ ok: boolean; message: string }> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Products/${productId}/report`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reasonCategory, details })
+            });
+            const data = await res.json().catch(() => ({}));
+            return { ok: res.ok, message: data.message ?? (res.ok ? 'Reporte enviado.' : 'Error al reportar.') };
+        } catch { return { ok: false, message: 'Error de conexión.' }; }
+    },
+    getAllAdmin: async (token: string, status?: string): Promise<ProductReport[]> => {
+        try {
+            const url = status ? `${API_BASE_URL}/Admin/product-reports?status=${status}` : `${API_BASE_URL}/Admin/product-reports`;
+            const res = await fetchApi(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    },
+    review: async (id: number, adminNotes: string | undefined, deactivateProduct: boolean, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/product-reports/${id}/review`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminNotes, deactivateProduct })
+            });
+            return res.ok;
+        } catch { return false; }
+    },
+    dismiss: async (id: number, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/product-reports/${id}/dismiss`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            return res.ok;
+        } catch { return false; }
+    }
+};

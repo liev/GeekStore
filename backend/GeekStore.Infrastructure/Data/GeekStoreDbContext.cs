@@ -21,6 +21,7 @@ namespace GeekStore.Infrastructure.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Dispute> Disputes { get; set; }
         public DbSet<Refund> Refunds { get; set; }
+        public DbSet<ProductReport> ProductReports { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -74,6 +75,24 @@ namespace GeekStore.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(r => r.BeneficiaryUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure ProductReport relationships
+            modelBuilder.Entity<ProductReport>()
+                .HasOne(pr => pr.Product)
+                .WithMany()
+                .HasForeignKey(pr => pr.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProductReport>()
+                .HasOne(pr => pr.ReporterUser)
+                .WithMany()
+                .HasForeignKey(pr => pr.ReporterUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // One report per user per product
+            modelBuilder.Entity<ProductReport>()
+                .HasIndex(pr => new { pr.ReporterUserId, pr.ProductId })
+                .IsUnique();
 
             modelBuilder.Entity<Review>()
                 .HasOne(r => r.Seller)

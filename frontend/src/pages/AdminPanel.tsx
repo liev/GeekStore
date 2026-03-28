@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShieldAlert, ShieldCheck, ArrowUpDown, Save, Layers, Plus, ChevronDown, ChevronRight, BarChart3, BrainCircuit, TrendingUp, Info, Search, Filter, X } from 'lucide-react';
-import { adminApi, settingsApi, categoriesApi, adminDashboardApi, catalogApi, reviewsApi, disputesApi, deliveryPointsApi, refundsApi, type User, type Category, type Product, type ReviewSummary, type Review, type Dispute, type DeliveryPoint, type SubscriptionPlan, type Refund } from '../api/client';
+import { adminApi, settingsApi, categoriesApi, adminDashboardApi, catalogApi, reviewsApi, disputesApi, deliveryPointsApi, refundsApi, reportsApi, type User, type Category, type Product, type ReviewSummary, type Review, type Dispute, type DeliveryPoint, type SubscriptionPlan, type Refund, type ProductReport } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 
@@ -26,7 +26,7 @@ export default function AdminPanel() {
     const [isUpdatingFee, setIsUpdatingFee] = useState(false);
 
     // Categories State
-    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard' | 'productos' | 'reseñas' | 'disputas' | 'puntos' | 'planes' | 'reembolsos'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard' | 'productos' | 'reseñas' | 'disputas' | 'puntos' | 'planes' | 'reembolsos' | 'reportes'>('dashboard');
 
     // Plans State
     const [adminPlans, setAdminPlans] = useState<SubscriptionPlan[]>([]);
@@ -78,6 +78,14 @@ export default function AdminPanel() {
     // Admin Refunds State
     const [adminRefunds, setAdminRefunds] = useState<Refund[]>([]);
     const [loadingRefunds, setLoadingRefunds] = useState(false);
+
+    // Admin Product Reports State
+    const [adminReports, setAdminReports] = useState<ProductReport[]>([]);
+    const [loadingReports, setLoadingReports] = useState(false);
+    const [reportFilter, setReportFilter] = useState<'all' | 'Pending' | 'Reviewed' | 'Dismissed'>('Pending');
+    const [reviewingReportId, setReviewingReportId] = useState<number | null>(null);
+    const [reportAdminNotes, setReportAdminNotes] = useState('');
+    const [reportDeactivate, setReportDeactivate] = useState(false);
 
     // Delivery Points State
     const [deliveryPoints, setDeliveryPoints] = useState<DeliveryPoint[]>([]);
@@ -131,7 +139,13 @@ export default function AdminPanel() {
             setLoadingRefunds(true);
             refundsApi.getAllAdmin(token).then(data => setAdminRefunds(data)).finally(() => setLoadingRefunds(false));
         }
-    }, [activeTab, token]);
+        if (activeTab === 'reportes' && token) {
+            setLoadingReports(true);
+            reportsApi.getAllAdmin(token, reportFilter === 'all' ? undefined : reportFilter)
+                .then(data => setAdminReports(data))
+                .finally(() => setLoadingReports(false));
+        }
+    }, [activeTab, token, reportFilter]);
 
     const handleAddPoint = async () => {
         if (!token || !newPointName.trim()) return;
@@ -565,6 +579,20 @@ export default function AdminPanel() {
                             }`}
                     >
                         💰 Reembolsos
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('reportes')}
+                        className={`px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'reportes'
+                            ? 'glass-panel text-white shadow-lg shadow-red-400/20 border-red-400'
+                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                            }`}
+                    >
+                        🚩 Reportes
+                        {adminReports.filter(r => r.status === 'Pending').length > 0 && (
+                            <span className="ml-2 bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                                {adminReports.filter(r => r.status === 'Pending').length}
+                            </span>
+                        )}
                     </button>
                     <button
                         onClick={() => setActiveTab('puntos')}
@@ -1193,6 +1221,144 @@ export default function AdminPanel() {
                                     </table>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {activeTab === 'reportes' && (
+                        <div className="relative z-10 w-full animate-in fade-in duration-300">
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                                <h2 className="text-xl font-bold text-white font-retro">🚩 Reportes de Contenido</h2>
+                                <div className="flex gap-2 flex-wrap">
+                                    {(['Pending', 'Reviewed', 'Dismissed', 'all'] as const).map(f => (
+                                        <button key={f} onClick={() => setReportFilter(f)}
+                                            className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all ${reportFilter === f ? 'bg-red-500/20 text-red-400 border-red-500/40' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'}`}>
+                                            {f === 'Pending' ? 'Pendientes' : f === 'Reviewed' ? 'Revisados' : f === 'Dismissed' ? 'Descartados' : 'Todos'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {loadingReports ? (
+                                <div className="p-8 text-center text-red-400 font-retro animate-pulse">CARGANDO REPORTES...</div>
+                            ) : adminReports.length === 0 ? (
+                                <div className="p-8 text-center text-slate-500 font-sans border-2 border-dashed border-slate-800 rounded-xl">No hay reportes {reportFilter !== 'all' ? `con estado "${reportFilter}"` : ''}.</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-700">
+                                                <th className="p-3 text-left text-slate-300 font-semibold">Producto</th>
+                                                <th className="p-3 text-left text-slate-300 font-semibold">Reportado por</th>
+                                                <th className="p-3 text-left text-slate-300 font-semibold">Razón</th>
+                                                <th className="p-3 text-center text-slate-300 font-semibold">Estado</th>
+                                                <th className="p-3 text-center text-slate-300 font-semibold">Fecha</th>
+                                                <th className="p-3 text-right text-slate-300 font-semibold">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {adminReports.map(report => (
+                                                <tr key={report.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                                                    <td className="p-3">
+                                                        <p className="font-semibold text-white">{report.productName}</p>
+                                                        <p className="text-xs text-slate-500">ID #{report.productId} {!report.productIsActive && <span className="text-red-400 ml-1">• Desactivado</span>}</p>
+                                                    </td>
+                                                    <td className="p-3 text-slate-300">{report.reporterNickname}</td>
+                                                    <td className="p-3">
+                                                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20">{report.reasonCategory}</span>
+                                                        {report.details && <p className="text-xs text-slate-500 mt-1 max-w-[200px] truncate">{report.details}</p>}
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold border ${
+                                                            report.status === 'Reviewed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                            report.status === 'Dismissed' ? 'bg-slate-700/50 text-slate-500 border-slate-700' :
+                                                            'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                        }`}>{report.status === 'Reviewed' ? 'Revisado' : report.status === 'Dismissed' ? 'Descartado' : 'Pendiente'}</span>
+                                                    </td>
+                                                    <td className="p-3 text-center text-slate-400 text-xs">{new Date(report.createdAt).toLocaleDateString('es-CR')}</td>
+                                                    <td className="p-3 text-right">
+                                                        {report.status === 'Pending' && (
+                                                            <div className="flex justify-end gap-2">
+                                                                <button
+                                                                    onClick={() => { setReviewingReportId(report.id); setReportAdminNotes(''); setReportDeactivate(false); }}
+                                                                    className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 transition-all"
+                                                                >
+                                                                    Revisar
+                                                                </button>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!token) return;
+                                                                        const ok = await reportsApi.dismiss(report.id, token);
+                                                                        if (ok) setAdminReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'Dismissed' } : r));
+                                                                    }}
+                                                                    className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white border border-slate-600 transition-all"
+                                                                >
+                                                                    Descartar
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            {/* Review Modal */}
+                            {reviewingReportId !== null && (() => {
+                                const report = adminReports.find(r => r.id === reviewingReportId);
+                                if (!report) return null;
+                                return (
+                                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                                        <div className="bg-slate-900 border border-red-500/30 rounded-2xl w-full max-w-md shadow-[0_0_40px_rgba(239,68,68,0.15)] overflow-hidden">
+                                            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-red-500/5">
+                                                <h3 className="text-red-400 font-bold font-display text-lg">🚩 Revisar Reporte #{report.id}</h3>
+                                                <button onClick={() => setReviewingReportId(null)} className="text-slate-400 hover:text-white transition-colors">✕</button>
+                                            </div>
+                                            <div className="p-6 space-y-4">
+                                                <div>
+                                                    <p className="text-slate-400 text-xs uppercase font-bold mb-1">Producto</p>
+                                                    <p className="text-white font-semibold">{report.productName} <span className="text-slate-500 font-normal text-xs">(ID #{report.productId})</span></p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-slate-400 text-xs uppercase font-bold mb-1">Motivo</p>
+                                                    <p className="text-orange-400 font-semibold">{report.reasonCategory}</p>
+                                                    {report.details && <p className="text-slate-300 text-sm mt-1">{report.details}</p>}
+                                                </div>
+                                                <div>
+                                                    <label className="text-slate-400 text-xs uppercase font-bold block mb-1">Notas del Admin</label>
+                                                    <textarea
+                                                        value={reportAdminNotes}
+                                                        onChange={e => setReportAdminNotes(e.target.value)}
+                                                        placeholder="Observaciones internas..."
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm font-sans focus:border-red-500 outline-none min-h-[80px] resize-none"
+                                                    />
+                                                </div>
+                                                <label className="flex items-center gap-3 cursor-pointer">
+                                                    <input type="checkbox" checked={reportDeactivate} onChange={e => setReportDeactivate(e.target.checked)}
+                                                        className="w-4 h-4 rounded border-slate-600 accent-red-500" />
+                                                    <span className="text-sm text-slate-300">Desactivar publicación y notificar al vendedor</span>
+                                                </label>
+                                                <div className="flex justify-end gap-3 pt-2">
+                                                    <button onClick={() => setReviewingReportId(null)} className="px-4 py-2 text-sm font-bold text-slate-400 hover:text-white transition-colors">Cancelar</button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!token) return;
+                                                            const ok = await reportsApi.review(report.id, reportAdminNotes || undefined, reportDeactivate, token);
+                                                            if (ok) {
+                                                                setAdminReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'Reviewed', adminNotes: reportAdminNotes, productIsActive: reportDeactivate ? false : r.productIsActive } : r));
+                                                                setReviewingReportId(null);
+                                                            }
+                                                        }}
+                                                        className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm px-6 py-2 rounded-xl shadow-lg shadow-emerald-500/20 transition-all"
+                                                    >
+                                                        Confirmar Revisión
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     )}
 

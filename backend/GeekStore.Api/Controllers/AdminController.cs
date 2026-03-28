@@ -382,5 +382,101 @@ namespace GeekStore.Api.Controllers
             await _context.SaveChangesAsync();
             return Ok(new { message = "Usuario cerrado permanentemente por la administración." });
         }
+
+        // ── Product Reports ───────────────────────────────────────────────
+
+        [HttpGet("product-reports")]
+        public async Task<IActionResult> GetProductReports([FromQuery] string? status = null)
+        {
+            var query = _context.ProductReports
+                .Include(r => r.Product)
+                .Include(r => r.ReporterUser)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(r => r.Status == status);
+
+            var reports = await query
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new {
+                    r.Id,
+                    r.ProductId,
+                    productName = r.Product!.Name,
+                    productIsActive = r.Product.IsActive,
+                    r.ReporterUserId,
+                    reporterNickname = r.ReporterUser!.Nickname ?? r.ReporterUser.Name,
+                    r.ReasonCategory,
+                    r.Details,
+                    r.Status,
+                    r.CreatedAt,
+                    r.ReviewedAt,
+                    r.AdminNotes
+                })
+                .ToListAsync();
+
+            return Ok(reports);
+        }
+
+        public class ReviewReportRequest
+        {
+            public string? AdminNotes { get; set; }
+            /// <summary>If true, the reported product will be deactivated.</summary>
+            public bool DeactivateProduct { get; set; } = false;
+        }
+
+        [HttpPut("product-reports/{id}/review")]
+        public async Task<IActionResult> ReviewProductReport(int id, [FromBody] ReviewReportRequest request)
+        {
+            var report = await _context.ProductReports
+                .Include(r => r.Product)
+                .Include(r => r.ReporterUser)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (report == null) return NotFound();
+            if (report.Status != "Pending") return BadRequest(new { message = "Este reporte ya fue revisado." });
+
+            report.Status = "Reviewed";
+            report.ReviewedAt = DateTime.UtcNow;
+            report.AdminNotes = request.AdminNotes;
+
+            if (request.DeactivateProduct && report.Product != null)
+            {
+                report.Product.IsActive = false;
+
+                await _notificationRepo.AddAsync(new Notification
+                {
+                    UserId = report.Product.SellerId,
+                    Title = "Publicación Desactivada",
+                    Message = $"Tu publicación \"{report.Product.Name}\" fue desactivada por el equipo de moderación tras recibir un reporte.",
+                    Type = "Alert"
+                });
+            }
+
+            // Notify reporter
+            await _notificationRepo.AddAsync(new Notification
+            {
+                UserId = report.ReporterUserId,
+                Title = "Reporte Revisado",
+                Message = $"Tu reporte sobre \"{report.Product?.Name ?? $"producto #{report.ProductId}"}\" fue revisado por el equipo de moderación. Gracias por contribuir a la comunidad.",
+                Type = "System"
+            });
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Reporte marcado como revisado." });
+        }
+
+        [HttpPut("product-reports/{id}/dismiss")]
+        public async Task<IActionResult> DismissProductReport(int id)
+        {
+            var report = await _context.ProductReports.FindAsync(id);
+            if (report == null) return NotFound();
+            if (report.Status != "Pending") return BadRequest(new { message = "Este reporte ya fue procesado." });
+
+            report.Status = "Dismissed";
+            report.ReviewedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Reporte descartado." });
+        }
     }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, User, SlidersHorizontal, ChevronDown, X, MessageCircle } from 'lucide-react';
+import { Search, ShoppingCart, User, SlidersHorizontal, ChevronDown, X, MessageCircle, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { catalogApi, categoriesApi, ordersApi, deliveryPointsApi, reviewsApi, type Product, type Category as ApiCategory, type OrderSellerInfo, type ReviewSummary, type DeliveryPoint } from '../api/client';
+import { catalogApi, categoriesApi, ordersApi, deliveryPointsApi, reviewsApi, reportsApi, type Product, type Category as ApiCategory, type OrderSellerInfo, type ReviewSummary, type DeliveryPoint } from '../api/client';
 import { StarRatingCompact } from './Profile';
 import NotificationBell from '../components/NotificationBell';
 export interface CartItem {
@@ -22,7 +22,7 @@ const INTEREST_TAGS = [
 ];
 
 // ── Compact Temu-style ProductCard ───────────────────────────────────────
-function ProductCard({ product, onAddToCart, ratingData }: { product: Product; onAddToCart: (p: Product, q: number) => void; ratingData?: ReviewSummary }) {
+function ProductCard({ product, onAddToCart, ratingData, onReport }: { product: Product; onAddToCart: (p: Product, q: number) => void; ratingData?: ReviewSummary; onReport?: (productId: number, productName: string) => void }) {
     const navigate = useNavigate();
     const images = [product.imageUrl, product.imageUrl2, product.imageUrl3].filter(u => u && u.trim() !== '');
     if (images.length === 0) images.push('');
@@ -131,6 +131,16 @@ function ProductCard({ product, onAddToCart, ratingData }: { product: Product; o
                     )}
                 </div>
             </div>
+            {onReport && (
+                <div className="px-3 pb-2 border-t border-slate-800/50 pt-1.5">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onReport(product.id, product.name); }}
+                        className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-red-400 transition-colors"
+                    >
+                        <Flag size={10} /> Reportar publicación
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
@@ -170,6 +180,12 @@ export default function Catalog() {
         !localStorage.getItem('gs_interests')
     );
     const [tempInterests, setTempInterests] = useState<Set<string>>(storedInterests);
+
+    // Report modal state
+    const [reportTarget, setReportTarget] = useState<{ id: number; name: string } | null>(null);
+    const [reportReason, setReportReason] = useState('Spam');
+    const [reportDetails, setReportDetails] = useState('');
+    const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
     const saveInterests = () => {
         localStorage.setItem('gs_interests', JSON.stringify([...tempInterests]));
@@ -628,6 +644,7 @@ export default function Catalog() {
                                             return [...prev, { product: p, quantity: q }];
                                         });
                                     }}
+                                    onReport={(id, name) => { setReportTarget({ id, name }); setReportReason('Spam'); setReportDetails(''); }}
                                 />
                             ))}
                         </div>
@@ -895,6 +912,66 @@ export default function Catalog() {
                         >
                             Ver todo sin personalizar
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Report Product Modal */}
+            {reportTarget && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-orange-500/30 rounded-2xl w-full max-w-md shadow-[0_0_40px_rgba(249,115,22,0.1)] overflow-hidden">
+                        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-orange-500/5">
+                            <h3 className="text-orange-400 font-bold flex items-center gap-2 font-display text-lg">
+                                <Flag size={18} /> Reportar Publicación
+                            </h3>
+                            <button onClick={() => setReportTarget(null)} className="text-slate-400 hover:text-white transition-colors"><X size={20} /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-slate-300 text-sm font-sans">
+                                Estás reportando: <strong className="text-white">{reportTarget.name}</strong>
+                            </p>
+                            <div>
+                                <label className="text-slate-400 text-xs uppercase font-bold block mb-2">Motivo</label>
+                                <select
+                                    value={reportReason}
+                                    onChange={e => setReportReason(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm font-sans focus:border-orange-500 outline-none"
+                                >
+                                    <option value="Spam">Spam o publicidad engañosa</option>
+                                    <option value="Fake">Producto falso o réplica</option>
+                                    <option value="Inappropriate">Contenido inapropiado</option>
+                                    <option value="Counterfeit">Piratería o falsificación</option>
+                                    <option value="Other">Otro</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-slate-400 text-xs uppercase font-bold block mb-2">Detalles <span className="text-slate-600 normal-case">(opcional)</span></label>
+                                <textarea
+                                    value={reportDetails}
+                                    onChange={e => setReportDetails(e.target.value)}
+                                    placeholder="Describe el problema con más detalle..."
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm font-sans focus:border-orange-500 outline-none min-h-[80px] resize-none"
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button onClick={() => setReportTarget(null)} className="px-4 py-2 text-sm font-bold text-slate-400 hover:text-white transition-colors">Cancelar</button>
+                                <button
+                                    disabled={isSubmittingReport}
+                                    onClick={async () => {
+                                        const token = localStorage.getItem('geekstore_token');
+                                        if (!token) { alert('Debes iniciar sesión para reportar.'); return; }
+                                        setIsSubmittingReport(true);
+                                        const { ok, message } = await reportsApi.report(reportTarget.id, reportReason, reportDetails || undefined, token);
+                                        setIsSubmittingReport(false);
+                                        alert(message);
+                                        if (ok) setReportTarget(null);
+                                    }}
+                                    className="bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-bold text-sm px-6 py-2 rounded-xl shadow-lg shadow-orange-500/20 transition-all font-sans"
+                                >
+                                    {isSubmittingReport ? 'Enviando...' : 'Enviar Reporte'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
