@@ -6,7 +6,11 @@ GeekStore es una plataforma de comercio electrónico orientada a la compra, vent
 Características principales:
 
 Gestión de Catálogo: Soporte para múltiples categorías, estados de stock y condiciones de artículos (Mint, Near Mint, etc.).
+
 Sistema de Vendedores: Suscripciones integradas con PayPal y límites de productos según el nivel del plan.
+
 Moderación Inteligente: Validación de imágenes mediante IA (Gemini Vision) para evitar contenido inapropiado.
+
 Panel Administrativo: Control total sobre usuarios, categorías, reportes de contenido y resolución de disputas.
+
 Stack Tecnológico: Backend robusto en ASP.NET Core (Entity Framework, PostgreSQL) y frontend dinámico con React (TypeScript, Tailwind, Zustand).
