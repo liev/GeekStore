@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Trash2, Box, Eye, Image as ImageIcon, ArrowUpDown, Pencil, X, Package, CheckCircle, Truck, PackageCheck } from 'lucide-react';
-import { catalogApi, sellersApi, settingsApi, usersApi, ordersApi, type Product, type Order, type SellerAnalyticsDto, type SubscriptionPlan } from '../api/client';
+import { catalogApi, sellersApi, settingsApi, usersApi, ordersApi, blocksApi, type Product, type Order, type SellerAnalyticsDto, type SubscriptionPlan, type BlockedUser } from '../api/client';
 import NotificationBell from '../components/NotificationBell';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
@@ -78,6 +78,10 @@ export default function Dashboard() {
     // Orders State
     const [sellerOrders, setSellerOrders] = useState<Order[]>([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
+
+    // Blocks State
+    const [myBlocks, setMyBlocks] = useState<BlockedUser[]>([]);
+    const [showBlocks, setShowBlocks] = useState(false);
     const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
     
     const openEditModal = (p: Product) => {
@@ -221,6 +225,12 @@ export default function Dashboard() {
 
         fetchInventory();
         fetchMetrics();
+
+        // Fetch blocked users
+        const storedToken = localStorage.getItem('geekstore_token');
+        if (storedToken) {
+            blocksApi.getMyBlocks(storedToken).then(setMyBlocks);
+        }
 
         // Fetch orders for orders tab
         const fetchOrders = async () => {
@@ -1144,6 +1154,55 @@ export default function Dashboard() {
                     )}
 
                 </div>
+
+                {/* Blocked Users Section */}
+                <div className="mt-6 border border-slate-800 rounded-xl overflow-hidden">
+                    <button
+                        onClick={() => setShowBlocks(b => !b)}
+                        className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-800/30 transition-colors"
+                    >
+                        <span className="text-slate-400 text-sm font-semibold flex items-center gap-2">
+                            🚫 Usuarios Bloqueados
+                            {myBlocks.length > 0 && (
+                                <span className="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">{myBlocks.length}</span>
+                            )}
+                        </span>
+                        <span className="text-slate-600 text-xs">{showBlocks ? '▲' : '▼'}</span>
+                    </button>
+                    {showBlocks && (
+                        <div className="border-t border-slate-800 p-4">
+                            {myBlocks.length === 0 ? (
+                                <p className="text-slate-600 text-sm text-center py-4">No has bloqueado a ningún usuario.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {myBlocks.map(b => (
+                                        <div key={b.blockedUserId} className="flex items-center justify-between p-3 bg-slate-800/30 rounded-lg">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                                                    {b.nickname[0]?.toUpperCase()}
+                                                </div>
+                                                <span className="text-white text-sm font-medium">{b.nickname}</span>
+                                            </div>
+                                            <button
+                                                onClick={async () => {
+                                                    const token = localStorage.getItem('geekstore_token');
+                                                    if (!token) return;
+                                                    const { ok, message } = await blocksApi.unblock(b.blockedUserId, token);
+                                                    if (ok) setMyBlocks(prev => prev.filter(x => x.blockedUserId !== b.blockedUserId));
+                                                    else alert(message);
+                                                }}
+                                                className="text-xs text-slate-500 hover:text-red-400 transition-colors font-sans"
+                                            >
+                                                Desbloquear
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
             </div>
 
             {/* Edit Modal */}

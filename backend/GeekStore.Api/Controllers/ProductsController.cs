@@ -5,16 +5,9 @@ using GeekStore.Core.Models;
 using GeekStore.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using System.IO;
-using System.Linq;
 using System.Security.Claims;
 using GeekStore.Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace GeekStore.Api.Controllers
 {
@@ -369,6 +362,9 @@ namespace GeekStore.Api.Controllers
 
             var product = await _context.Products.FindAsync(id);
             if (product == null) return NotFound(new { message = "Producto no encontrado." });
+
+            if (product.SellerId == userId)
+                return BadRequest(new { message = "No puedes reportar tu propio producto." });
 
             var validReasons = new[] { "Spam", "Fake", "Inappropriate", "Counterfeit", "Other" };
             if (!validReasons.Contains(request.ReasonCategory))

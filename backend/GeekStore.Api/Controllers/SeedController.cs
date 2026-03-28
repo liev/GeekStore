@@ -74,6 +74,22 @@ namespace GeekStore.Api.Controllers
             return Ok(new { message = "Refunds table and Disputes.ResolvedAt column created" });
         }
 
+        [HttpPost("create-user-blocks-table")]
+        public async Task<IActionResult> CreateUserBlocksTable()
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE IF NOT EXISTS ""UserBlocks"" (
+                    ""BlockerId"" integer NOT NULL,
+                    ""BlockedUserId"" integer NOT NULL,
+                    ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT now(),
+                    CONSTRAINT ""PK_UserBlocks"" PRIMARY KEY (""BlockerId"", ""BlockedUserId""),
+                    CONSTRAINT ""FK_UserBlocks_Blocker"" FOREIGN KEY (""BlockerId"") REFERENCES ""Users"" (""Id"") ON DELETE RESTRICT,
+                    CONSTRAINT ""FK_UserBlocks_Blocked"" FOREIGN KEY (""BlockedUserId"") REFERENCES ""Users"" (""Id"") ON DELETE RESTRICT
+                );
+            ");
+            return Ok(new { message = "UserBlocks table ready." });
+        }
+
         [HttpPost("create-product-reports-table")]
         public async Task<IActionResult> CreateProductReportsTable()
         {

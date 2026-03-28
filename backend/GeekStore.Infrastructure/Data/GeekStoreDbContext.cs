@@ -22,6 +22,7 @@ namespace GeekStore.Infrastructure.Data
         public DbSet<Dispute> Disputes { get; set; }
         public DbSet<Refund> Refunds { get; set; }
         public DbSet<ProductReport> ProductReports { get; set; }
+        public DbSet<UserBlock> UserBlocks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -93,6 +94,22 @@ namespace GeekStore.Infrastructure.Data
             modelBuilder.Entity<ProductReport>()
                 .HasIndex(pr => new { pr.ReporterUserId, pr.ProductId })
                 .IsUnique();
+
+            // Configure UserBlock
+            modelBuilder.Entity<UserBlock>()
+                .HasKey(ub => new { ub.BlockerId, ub.BlockedUserId });
+
+            modelBuilder.Entity<UserBlock>()
+                .HasOne(ub => ub.Blocker)
+                .WithMany()
+                .HasForeignKey(ub => ub.BlockerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<UserBlock>()
+                .HasOne(ub => ub.BlockedUser)
+                .WithMany()
+                .HasForeignKey(ub => ub.BlockedUserId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Review>()
                 .HasOne(r => r.Seller)

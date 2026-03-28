@@ -4,10 +4,6 @@ using GeekStore.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace GeekStore.Api.Controllers
 {
@@ -240,6 +236,8 @@ namespace GeekStore.Api.Controllers
         {
             var dispute = await _context.Disputes.FindAsync(id);
             if (dispute == null) return NotFound();
+            if (dispute.Status == "Resolved")
+                return BadRequest(new { message = "Esta disputa ya fue resuelta. No se puede resolver dos veces." });
 
             dispute.Status = "Resolved";
             dispute.AdminResolution = request.Resolution;
@@ -325,6 +323,9 @@ namespace GeekStore.Api.Controllers
                 .FirstOrDefaultAsync(r => r.Id == id);
             if (refund == null) return NotFound();
 
+            if (refund.Status != "Pending")
+                return BadRequest(new { message = $"El reembolso ya fue procesado (estado actual: {refund.Status}). No se puede procesar dos veces." });
+
             refund.Status = "Processed";
             refund.ProcessedAt = System.DateTime.UtcNow;
             if (!string.IsNullOrWhiteSpace(request?.Notes))
@@ -347,6 +348,9 @@ namespace GeekStore.Api.Controllers
         {
             var refund = await _context.Refunds.FindAsync(id);
             if (refund == null) return NotFound();
+
+            if (refund.Status != "Pending")
+                return BadRequest(new { message = $"El reembolso ya fue procesado (estado actual: {refund.Status}). No se puede modificar." });
 
             refund.Status = "Rejected";
             refund.ProcessedAt = System.DateTime.UtcNow;

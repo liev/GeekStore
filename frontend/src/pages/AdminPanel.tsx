@@ -137,12 +137,16 @@ export default function AdminPanel() {
     useEffect(() => {
         if (activeTab === 'reembolsos' && token) {
             setLoadingRefunds(true);
-            refundsApi.getAllAdmin(token).then(data => setAdminRefunds(data)).finally(() => setLoadingRefunds(false));
+            refundsApi.getAllAdmin(token)
+                .then(data => setAdminRefunds(data))
+                .catch(() => setAdminRefunds([]))
+                .finally(() => setLoadingRefunds(false));
         }
         if (activeTab === 'reportes' && token) {
             setLoadingReports(true);
             reportsApi.getAllAdmin(token, reportFilter === 'all' ? undefined : reportFilter)
                 .then(data => setAdminReports(data))
+                .catch(() => setAdminReports([]))
                 .finally(() => setLoadingReports(false));
         }
     }, [activeTab, token, reportFilter]);
@@ -1195,8 +1199,11 @@ export default function AdminPanel() {
                                                                 <button
                                                                     onClick={async () => {
                                                                         if (!token) return;
-                                                                        const ok = await refundsApi.process(refund.id, undefined, token);
-                                                                        if (ok) setAdminRefunds(prev => prev.map(r => r.id === refund.id ? { ...r, status: 'Processed' } : r));
+                                                                        try {
+                                                                            const ok = await refundsApi.process(refund.id, undefined, token);
+                                                                            if (ok) setAdminRefunds(prev => prev.map(r => r.id === refund.id ? { ...r, status: 'Processed' } : r));
+                                                                            else alert('Error al procesar el reembolso.');
+                                                                        } catch { alert('Error de red al procesar el reembolso.'); }
                                                                     }}
                                                                     className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 transition-all"
                                                                 >
@@ -1205,8 +1212,11 @@ export default function AdminPanel() {
                                                                 <button
                                                                     onClick={async () => {
                                                                         if (!token) return;
-                                                                        const ok = await refundsApi.reject(refund.id, undefined, token);
-                                                                        if (ok) setAdminRefunds(prev => prev.map(r => r.id === refund.id ? { ...r, status: 'Rejected' } : r));
+                                                                        try {
+                                                                            const ok = await refundsApi.reject(refund.id, undefined, token);
+                                                                            if (ok) setAdminRefunds(prev => prev.map(r => r.id === refund.id ? { ...r, status: 'Rejected' } : r));
+                                                                            else alert('Error al rechazar el reembolso.');
+                                                                        } catch { alert('Error de red al rechazar el reembolso.'); }
                                                                     }}
                                                                     className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/30 transition-all"
                                                                 >

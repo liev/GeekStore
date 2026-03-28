@@ -1121,3 +1121,50 @@ export const reportsApi = {
         } catch { return false; }
     }
 };
+
+export interface BlockedUser {
+    blockedUserId: number;
+    nickname: string;
+    blockedAt: string;
+}
+
+export const blocksApi = {
+    block: async (targetId: number, token: string): Promise<{ ok: boolean; message: string }> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/UserBlocks/${targetId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            return { ok: res.ok, message: data.message ?? (res.ok ? 'Usuario bloqueado.' : 'Error al bloquear.') };
+        } catch { return { ok: false, message: 'Error de conexión.' }; }
+    },
+    unblock: async (targetId: number, token: string): Promise<{ ok: boolean; message: string }> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/UserBlocks/${targetId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            return { ok: res.ok, message: data.message ?? (res.ok ? 'Desbloqueado.' : 'Error.') };
+        } catch { return { ok: false, message: 'Error de conexión.' }; }
+    },
+    getMyBlocks: async (token: string): Promise<BlockedUser[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/UserBlocks/my-blocks`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    },
+    getMyBlockIds: async (token: string): Promise<number[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/UserBlocks/my-block-ids`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    }
+};

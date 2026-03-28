@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { usersApi, catalogApi, reviewsApi, type UserProfileDto, type Product, type Review, type ReviewSummary } from '../api/client';
+import { usersApi, catalogApi, reviewsApi, blocksApi, type UserProfileDto, type Product, type Review, type ReviewSummary } from '../api/client';
 import { UserPlus, UserMinus, Package, BadgeCheck, Star, Send } from 'lucide-react';
 
 // ── Reusable StarRating Component ─────────────────────────────────────
@@ -68,6 +68,9 @@ export default function Profile() {
     const [loading, setLoading] = useState(true);
     const [token, setToken] = useState<string | null>(null);
 
+    const [isBlocked, setIsBlocked] = useState(false);
+    const [blockLoading, setBlockLoading] = useState(false);
+
     // Reviews state
     const [reviews, setReviews] = useState<Review[]>([]);
     const [ratingSummary, setRatingSummary] = useState<ReviewSummary>({ averageRating: 0, reviewCount: 0 });
@@ -96,6 +99,14 @@ export default function Profile() {
                 setProducts(sellerProducts.filter(p => p.stockStatus === 'Available' && p.stockCount > 0));
                 setReviews(sellerReviews);
                 setRatingSummary(summary);
+
+                // Check if this seller is blocked by current user
+                const storedToken2 = localStorage.getItem('geekstore_token');
+                if (storedToken2 && id) {
+                    blocksApi.getMyBlockIds(storedToken2).then(ids => {
+                        setIsBlocked(ids.includes(Number(id)));
+                    });
+                }
 
                 // Check if current user already has a review and pre-fill
                 if (storedToken) {
@@ -210,11 +221,11 @@ export default function Profile() {
                             <Package size={16} /> <span className="text-sm">{profile.totalActiveProducts} Productos Activos</span>
                         </div>
 
-                        <button 
+                        <button
                             onClick={handleFollowToggle}
                             className={`w-full py-3 px-4 rounded-xl font-bold font-sans transition-all duration-300 flex items-center justify-center gap-2 ${
-                                profile.isFollowing 
-                                ? 'bg-slate-800 text-white border border-slate-600 hover:bg-slate-700' 
+                                profile.isFollowing
+                                ? 'bg-slate-800 text-white border border-slate-600 hover:bg-slate-700'
                                 : 'bg-neon-blue text-slate-900 hover:bg-cyan-400 shadow-lg shadow-neon-blue/20'
                             }`}
                         >
@@ -224,6 +235,39 @@ export default function Profile() {
                                 <><UserPlus size={20} /> Seguir Vendedor</>
                             )}
                         </button>
+
+                        {/* Block/Unblock button — only show if viewing someone else's profile */}
+                        {localStorage.getItem('geekstore_token') && (() => {
+                            // Don't show on own profile
+                            try {
+                                const payload = JSON.parse(atob(localStorage.getItem('geekstore_token')!.split('.')[1]));
+                                const myId = parseInt(payload.sub || payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || '0');
+                                if (myId === Number(id)) return null;
+                            } catch { /* ignore */ }
+                            return (
+                                <button
+                                    disabled={blockLoading}
+                                    onClick={async () => {
+                                        const token = localStorage.getItem('geekstore_token');
+                                        if (!token) return;
+                                        setBlockLoading(true);
+                                        const result = isBlocked
+                                            ? await blocksApi.unblock(Number(id), token)
+                                            : await blocksApi.block(Number(id), token);
+                                        if (result.ok) setIsBlocked(!isBlocked);
+                                        setBlockLoading(false);
+                                        alert(result.message);
+                                    }}
+                                    className={`w-full mt-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
+                                        isBlocked
+                                            ? 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40'
+                                            : 'bg-slate-800/50 text-slate-500 border-slate-700 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30'
+                                    } disabled:opacity-50`}
+                                >
+                                    {blockLoading ? '...' : isBlocked ? '🔓 Desbloquear' : '🚫 Bloquear'}
+                                </button>
+                            );
+                        })()}
                     </div>
 
                     {/* ── Write Review Form ──────────────────────────────── */}

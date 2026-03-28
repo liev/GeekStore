@@ -393,15 +393,8 @@ export default function MyPurchases() {
                                         setIsSubmittingDispute(false);
                                         if(success) {
                                             alert('Disputa enviada. El Gremio revisará el caso.');
-                                            setMyDisputes(prev => [...prev, {
-                                                id: 0,
-                                                orderId: selectedOrderId!,
-                                                initiator: { id: 0, name: '' },
-                                                target: { id: 0, name: '' },
-                                                reason: disputeReason,
-                                                status: 'Open',
-                                                createdAt: new Date().toISOString()
-                                            }]);
+                                            // Reload from server so dispute.id is real (needed for appeal)
+                                            disputesApi.getMyDisputes(token).then(setMyDisputes);
                                             setIsDisputeModalOpen(false);
                                             setDisputeReason('');
                                         } else {

@@ -40,3 +40,9 @@ eslint_report.json
 eslint_compact.txt
 lint_output.json
 lint_output_utf8.json
+
+# ── Build artifacts / CI logs ────────────────
+build_errors*.txt
+build_output*.txt
+build_args.txt
+clean_errors.txt

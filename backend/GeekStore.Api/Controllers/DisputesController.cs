@@ -3,10 +3,7 @@ using GeekStore.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Linq;
 using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace GeekStore.Api.Controllers
 {
@@ -79,12 +76,10 @@ namespace GeekStore.Api.Controllers
             }
             catch (System.Exception ex)
             {
-                // Return detailed error for debugging during audit
-                return StatusCode(500, new { 
-                    message = "Error crítico al guardar la disputa en la base de datos.", 
-                    error = ex.Message,
-                    innerError = ex.InnerException?.Message,
-                    stackTrace = ex.StackTrace // Temporarily for audit
+                // Log the full exception server-side; never expose internals to clients
+                Console.Error.WriteLine($"[DisputesController] OpenDispute error: {ex}");
+                return StatusCode(500, new {
+                    message = "Error interno al procesar la disputa. Por favor intenta más tarde."
                 });
             }
         }
