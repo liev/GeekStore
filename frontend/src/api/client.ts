@@ -946,7 +946,21 @@ export interface Dispute {
     status: string;
     createdAt: string;
     adminResolution?: string;
+    resolvedAt?: string | null;
     orderTotal?: number;
+}
+
+export interface Refund {
+    id: number;
+    disputeId: number;
+    orderId: number;
+    beneficiaryId?: number;
+    beneficiaryNickname?: string;
+    amount: number;
+    status: string; // Pending | Processed | Rejected
+    createdAt: string;
+    processedAt?: string | null;
+    notes?: string | null;
 }
 
 export const disputesApi = {
@@ -969,6 +983,16 @@ export const disputesApi = {
             return await res.json();
         } catch { return []; }
     },
+    appeal: async (id: number, token: string): Promise<{ ok: boolean; message: string }> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Disputes/${id}/appeal`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            return { ok: res.ok, message: data.message ?? (res.ok ? 'Apelación enviada.' : 'Error al apelar.') };
+        } catch { return { ok: false, message: 'Error de conexión.' }; }
+    },
     getAllAdmin: async (token: string): Promise<Dispute[]> => {
         try {
             const res = await fetchApi(`${API_BASE_URL}/Admin/disputes`, {
@@ -978,12 +1002,63 @@ export const disputesApi = {
             return await res.json();
         } catch { return []; }
     },
-    resolveAdmin: async (id: number, resolution: string, token: string): Promise<boolean> => {
+    resolveAdmin: async (
+        id: number,
+        resolution: string,
+        token: string,
+        refundOpts?: { issueRefund: boolean; refundAmount: number; refundBeneficiaryUserId?: number }
+    ): Promise<boolean> => {
         try {
             const res = await fetchApi(`${API_BASE_URL}/Admin/disputes/${id}/resolve`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ resolution })
+                body: JSON.stringify({
+                    resolution,
+                    issueRefund: refundOpts?.issueRefund ?? false,
+                    refundAmount: refundOpts?.refundAmount ?? 0,
+                    refundBeneficiaryUserId: refundOpts?.refundBeneficiaryUserId
+                })
+            });
+            return res.ok;
+        } catch { return false; }
+    }
+};
+
+export const refundsApi = {
+    getMyRefunds: async (token: string): Promise<Refund[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Disputes/my-refunds`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    },
+    getAllAdmin: async (token: string): Promise<Refund[]> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/refunds`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    },
+    process: async (id: number, notes: string | undefined, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/refunds/${id}/process`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes })
+            });
+            return res.ok;
+        } catch { return false; }
+    },
+    reject: async (id: number, notes: string | undefined, token: string): Promise<boolean> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Admin/refunds/${id}/reject`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes })
             });
             return res.ok;
         } catch { return false; }

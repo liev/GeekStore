@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ordersApi, disputesApi, reviewsApi, type Order, type Dispute } from '../api/client';
+import { ordersApi, disputesApi, reviewsApi, refundsApi, type Order, type Dispute, type Refund } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { Package, Clock, CheckCircle, MessageCircle, Truck, PackageCheck, AlertTriangle, X, Star } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
@@ -46,6 +46,7 @@ function StarRating({ rating, size = 18, interactive = false, onChange }: {
 export default function MyPurchases() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [myDisputes, setMyDisputes] = useState<Dispute[]>([]);
+    const [myRefunds, setMyRefunds] = useState<Refund[]>([]);
     const [loading, setLoading] = useState(true);
     const [token, setToken] = useState<string | null>(null);
     
@@ -74,12 +75,14 @@ export default function MyPurchases() {
 
         const fetchOrders = async () => {
             try {
-                const [data, disputes] = await Promise.all([
+                const [data, disputes, refunds] = await Promise.all([
                     ordersApi.getMyPurchases(storedToken),
-                    disputesApi.getMyDisputes(storedToken)
+                    disputesApi.getMyDisputes(storedToken),
+                    refundsApi.getMyRefunds(storedToken)
                 ]);
                 setOrders(data);
                 setMyDisputes(disputes);
+                setMyRefunds(refunds);
             } catch (err) {
                 console.error(err);
             } finally {
@@ -270,26 +273,87 @@ export default function MyPurchases() {
                                         )}
                                     </div>
 
-                                    {/* Dispute Button */}
-                                    <div className="flex-grow md:text-right flex justify-end">
-                                        {myDisputes.some(d => d.orderId === order.id && d.status !== 'Closed') ? (
-                                            <span className="inline-flex items-center gap-2 bg-red-500/10 text-red-400 font-bold text-[10px] px-3 py-1.5 rounded-xl border border-red-500/20 uppercase tracking-wider">
-                                                <AlertTriangle size={12} /> Disputa Abierta
-                                            </span>
-                                        ) : (
-                                            <button
-                                                onClick={() => { setSelectedOrderId(order.id); setIsDisputeModalOpen(true); }}
-                                                className="inline-flex items-center gap-2 bg-slate-900/50 hover:bg-red-500/10 text-slate-500 hover:text-red-400 font-bold text-[10px] px-3 py-1.5 rounded-xl border border-slate-800 hover:border-red-500/30 transition-all font-sans uppercase tracking-wider"
-                                            >
-                                                <AlertTriangle size={12} /> Reportar Problema
-                                            </button>
-                                        )}
+                                    {/* Dispute / Appeal area */}
+                                    <div className="flex-grow md:text-right flex flex-wrap justify-end gap-2">
+                                        {(() => {
+                                            const dispute = myDisputes.find(d => d.orderId === order.id);
+                                            if (!dispute) {
+                                                return (
+                                                    <button
+                                                        onClick={() => { setSelectedOrderId(order.id); setIsDisputeModalOpen(true); }}
+                                                        className="inline-flex items-center gap-2 bg-slate-900/50 hover:bg-red-500/10 text-slate-500 hover:text-red-400 font-bold text-[10px] px-3 py-1.5 rounded-xl border border-slate-800 hover:border-red-500/30 transition-all font-sans uppercase tracking-wider"
+                                                    >
+                                                        <AlertTriangle size={12} /> Reportar Problema
+                                                    </button>
+                                                );
+                                            }
+                                            const statusLabel = dispute.status === 'Appealed' ? 'Apelada' : dispute.status === 'Resolved' ? 'Resuelta' : 'Abierta';
+                                            const statusColor = dispute.status === 'Resolved' ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10' : dispute.status === 'Appealed' ? 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10' : 'text-red-400 border-red-500/20 bg-red-500/10';
+                                            const canAppeal = dispute.status === 'Resolved' && dispute.resolvedAt
+                                                && (Date.now() - new Date(dispute.resolvedAt).getTime()) < 48 * 3600 * 1000;
+                                            return (
+                                                <>
+                                                    <span className={`inline-flex items-center gap-2 font-bold text-[10px] px-3 py-1.5 rounded-xl border uppercase tracking-wider ${statusColor}`}>
+                                                        <AlertTriangle size={12} /> Disputa {statusLabel}
+                                                    </span>
+                                                    {canAppeal && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                const result = await disputesApi.appeal(dispute.id, token!);
+                                                                if (result.ok) {
+                                                                    setMyDisputes(prev => prev.map(d => d.id === dispute.id ? { ...d, status: 'Appealed' } : d));
+                                                                }
+                                                                alert(result.message);
+                                                            }}
+                                                            className="inline-flex items-center gap-2 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500 hover:text-slate-900 font-bold text-[10px] px-3 py-1.5 rounded-xl border border-yellow-500/30 transition-all uppercase tracking-wider"
+                                                        >
+                                                            Apelar Resolución
+                                                        </button>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
+
+            {/* Refunds Section */}
+            {myRefunds.length > 0 && (
+                <section className="w-full max-w-4xl mt-8">
+                    <h2 className="text-lg font-display font-bold text-white mb-4 flex items-center gap-2">
+                        <span className="text-emerald-400">💰</span> Mis Reembolsos
+                    </h2>
+                    <div className="space-y-3">
+                        {myRefunds.map(refund => (
+                            <div key={refund.id} className="glass-panel border border-slate-700/50 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                <div>
+                                    <p className="text-white font-sans text-sm">
+                                        Reembolso por disputa <span className="text-neon-blue">#{refund.disputeId}</span>{' '}
+                                        — Orden <span className="text-neon-blue">#{refund.orderId}</span>
+                                    </p>
+                                    <p className="text-2xl font-display font-bold text-emerald-400 mt-1">
+                                        ₡{refund.amount.toLocaleString('es-CR')}
+                                    </p>
+                                    {refund.notes && <p className="text-slate-400 text-xs mt-1">{refund.notes}</p>}
+                                </div>
+                                <div className="text-right">
+                                    <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold border uppercase ${
+                                        refund.status === 'Processed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                        refund.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                        'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                    }`}>
+                                        {refund.status === 'Processed' ? 'Procesado' : refund.status === 'Rejected' ? 'Rechazado' : 'Pendiente'}
+                                    </span>
+                                    <p className="text-slate-500 text-[10px] mt-1">{new Date(refund.createdAt).toLocaleDateString('es-CR')}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
             </main>
 
             {/* Dispute Modal */}

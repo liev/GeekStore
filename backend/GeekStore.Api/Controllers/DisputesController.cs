@@ -118,6 +118,31 @@ namespace GeekStore.Api.Controllers
             return Ok(disputes);
         }
 
+        [HttpGet("my-refunds")]
+        public async Task<IActionResult> GetMyRefunds()
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out int userId)) return Unauthorized();
+
+            var refunds = await _context.Refunds
+                .Include(r => r.Dispute)
+                .Where(r => r.BeneficiaryUserId == userId)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new {
+                    id = r.Id,
+                    disputeId = r.DisputeId,
+                    orderId = r.Dispute!.OrderId,
+                    amount = r.Amount,
+                    status = r.Status,
+                    createdAt = r.CreatedAt,
+                    processedAt = r.ProcessedAt,
+                    notes = r.Notes
+                })
+                .ToListAsync();
+
+            return Ok(refunds);
+        }
+
         [HttpPost("{id}/appeal")]
         public async Task<IActionResult> AppealDispute(int id)
         {

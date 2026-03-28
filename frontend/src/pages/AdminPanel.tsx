@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShieldAlert, ShieldCheck, ArrowUpDown, Save, Layers, Plus, ChevronDown, ChevronRight, BarChart3, BrainCircuit, TrendingUp, Info, Search, Filter, X } from 'lucide-react';
-import { adminApi, settingsApi, categoriesApi, adminDashboardApi, catalogApi, reviewsApi, disputesApi, deliveryPointsApi, type User, type Category, type Product, type ReviewSummary, type Review, type Dispute, type DeliveryPoint, type SubscriptionPlan } from '../api/client';
+import { adminApi, settingsApi, categoriesApi, adminDashboardApi, catalogApi, reviewsApi, disputesApi, deliveryPointsApi, refundsApi, type User, type Category, type Product, type ReviewSummary, type Review, type Dispute, type DeliveryPoint, type SubscriptionPlan, type Refund } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 
@@ -26,7 +26,7 @@ export default function AdminPanel() {
     const [isUpdatingFee, setIsUpdatingFee] = useState(false);
 
     // Categories State
-    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard' | 'productos' | 'reseñas' | 'disputas' | 'puntos' | 'planes'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'usuarios' | 'categorias' | 'dashboard' | 'productos' | 'reseñas' | 'disputas' | 'puntos' | 'planes' | 'reembolsos'>('dashboard');
 
     // Plans State
     const [adminPlans, setAdminPlans] = useState<SubscriptionPlan[]>([]);
@@ -72,6 +72,12 @@ export default function AdminPanel() {
     const [loadingDisputes, setLoadingDisputes] = useState(false);
     const [resolvingDisputeId, setResolvingDisputeId] = useState<number | null>(null);
     const [disputeResolution, setDisputeResolution] = useState('');
+    const [disputeIssueRefund, setDisputeIssueRefund] = useState(false);
+    const [disputeRefundAmount, setDisputeRefundAmount] = useState('');
+
+    // Admin Refunds State
+    const [adminRefunds, setAdminRefunds] = useState<Refund[]>([]);
+    const [loadingRefunds, setLoadingRefunds] = useState(false);
 
     // Delivery Points State
     const [deliveryPoints, setDeliveryPoints] = useState<DeliveryPoint[]>([]);
@@ -119,6 +125,13 @@ export default function AdminPanel() {
             settingsApi.getPlans().then(data => setAdminPlans(data)).finally(() => setLoadingPlans(false));
         }
     }, [activeTab, adminPlans.length]);
+
+    useEffect(() => {
+        if (activeTab === 'reembolsos' && token) {
+            setLoadingRefunds(true);
+            refundsApi.getAllAdmin(token).then(data => setAdminRefunds(data)).finally(() => setLoadingRefunds(false));
+        }
+    }, [activeTab, token]);
 
     const handleAddPoint = async () => {
         if (!token || !newPointName.trim()) return;
@@ -538,6 +551,20 @@ export default function AdminPanel() {
                             }`}
                     >
                         Disputas
+                        {adminDisputes.filter(d => d.status === 'Appealed').length > 0 && (
+                            <span className="ml-2 bg-yellow-400 text-slate-900 text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                                {adminDisputes.filter(d => d.status === 'Appealed').length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('reembolsos')}
+                        className={`px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'reembolsos'
+                            ? 'glass-panel text-white shadow-lg shadow-emerald-400/20 border-emerald-400'
+                            : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 border border-transparent'
+                            }`}
+                    >
+                        💰 Reembolsos
                     </button>
                     <button
                         onClick={() => setActiveTab('puntos')}
@@ -1030,20 +1057,51 @@ export default function AdminPanel() {
                                             value={disputeResolution}
                                             onChange={e => setDisputeResolution(e.target.value)}
                                             placeholder="Describe la resolución y próximos pasos para ambas partes..."
-                                            className="w-full h-32 bg-slate-800 text-white rounded-xl p-3 text-sm resize-none border border-slate-600 focus:border-neon-blue focus:outline-none mb-4"
+                                            className="w-full h-28 bg-slate-800 text-white rounded-xl p-3 text-sm resize-none border border-slate-600 focus:border-neon-blue focus:outline-none mb-4"
                                         />
+                                        {/* Refund option */}
+                                        <div className="bg-slate-800/60 rounded-xl p-4 mb-4 space-y-3 border border-slate-700">
+                                            <label className="flex items-center gap-3 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={disputeIssueRefund}
+                                                    onChange={e => setDisputeIssueRefund(e.target.checked)}
+                                                    className="w-4 h-4 accent-emerald-400"
+                                                />
+                                                <span className="text-sm font-semibold text-white">Emitir reembolso al comprador</span>
+                                            </label>
+                                            {disputeIssueRefund && (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-slate-400 text-sm">₡</span>
+                                                    <input
+                                                        type="number"
+                                                        value={disputeRefundAmount}
+                                                        onChange={e => setDisputeRefundAmount(e.target.value)}
+                                                        placeholder="Monto del reembolso"
+                                                        className="flex-1 bg-slate-900 border border-emerald-400/50 focus:border-emerald-400 rounded-lg text-white p-2 text-sm outline-none"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="flex gap-3">
-                                            <button onClick={() => setResolvingDisputeId(null)} className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all">
+                                            <button
+                                                onClick={() => { setResolvingDisputeId(null); setDisputeIssueRefund(false); setDisputeRefundAmount(''); setDisputeResolution(''); }}
+                                                className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all"
+                                            >
                                                 Cancelar
                                             </button>
                                             <button
-                                                disabled={!disputeResolution.trim()}
+                                                disabled={!disputeResolution.trim() || (disputeIssueRefund && !disputeRefundAmount)}
                                                 onClick={async () => {
                                                     if (!token || !disputeResolution.trim()) return;
                                                     try {
-                                                        await disputesApi.resolveAdmin(resolvingDisputeId, disputeResolution, token);
+                                                        await disputesApi.resolveAdmin(resolvingDisputeId, disputeResolution, token,
+                                                            disputeIssueRefund ? { issueRefund: true, refundAmount: parseFloat(disputeRefundAmount) } : undefined);
                                                         setAdminDisputes(prev => prev.map(d => d.id === resolvingDisputeId ? { ...d, status: 'Resolved', adminResolution: disputeResolution } : d));
                                                         setResolvingDisputeId(null);
+                                                        setDisputeIssueRefund(false);
+                                                        setDisputeRefundAmount('');
+                                                        setDisputeResolution('');
                                                     } catch (e) { alert('Error al resolver la disputa.'); }
                                                 }}
                                                 className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-neon-blue text-white hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1052,6 +1110,87 @@ export default function AdminPanel() {
                                             </button>
                                         </div>
                                     </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'reembolsos' && (
+                        <div className="relative z-10 w-full animate-in fade-in duration-300">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-white font-retro">💰 Reembolsos</h2>
+                                <button
+                                    onClick={() => { setLoadingRefunds(true); refundsApi.getAllAdmin(token!).then(data => setAdminRefunds(data)).finally(() => setLoadingRefunds(false)); }}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all"
+                                >
+                                    Actualizar
+                                </button>
+                            </div>
+                            {loadingRefunds ? (
+                                <div className="p-8 text-center text-emerald-400 font-retro animate-pulse">CARGANDO REEMBOLSOS...</div>
+                            ) : adminRefunds.length === 0 ? (
+                                <div className="p-8 text-center text-slate-500 font-sans border-2 border-dashed border-slate-800 rounded-xl">No hay reembolsos registrados.</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-700">
+                                                <th className="p-4 text-left text-slate-300 font-semibold">ID</th>
+                                                <th className="p-4 text-left text-slate-300 font-semibold">Beneficiario</th>
+                                                <th className="p-4 text-left text-slate-300 font-semibold">Disputa / Orden</th>
+                                                <th className="p-4 text-right text-slate-300 font-semibold">Monto</th>
+                                                <th className="p-4 text-center text-slate-300 font-semibold">Estado</th>
+                                                <th className="p-4 text-center text-slate-300 font-semibold">Fecha</th>
+                                                <th className="p-4 text-right text-slate-300 font-semibold">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {adminRefunds.map(refund => (
+                                                <tr key={refund.id} className="border-b border-slate-800 hover:bg-slate-800/40 transition-colors">
+                                                    <td className="p-4 text-slate-400 font-retro text-xs">#{refund.id}</td>
+                                                    <td className="p-4 text-white font-medium">{refund.beneficiaryNickname ?? `ID:${refund.beneficiaryId}`}</td>
+                                                    <td className="p-4 text-slate-400 text-xs">Disputa #{refund.disputeId} · Orden #{refund.orderId}</td>
+                                                    <td className="p-4 text-right text-emerald-400 font-bold">₡{refund.amount.toLocaleString('es-CR')}</td>
+                                                    <td className="p-4 text-center">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${
+                                                            refund.status === 'Processed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                            refund.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                            'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                        }`}>
+                                                            {refund.status === 'Processed' ? 'Procesado' : refund.status === 'Rejected' ? 'Rechazado' : 'Pendiente'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-center text-slate-500 text-xs">{new Date(refund.createdAt).toLocaleDateString('es-CR')}</td>
+                                                    <td className="p-4 text-right">
+                                                        {refund.status === 'Pending' && (
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!token) return;
+                                                                        const ok = await refundsApi.process(refund.id, undefined, token);
+                                                                        if (ok) setAdminRefunds(prev => prev.map(r => r.id === refund.id ? { ...r, status: 'Processed' } : r));
+                                                                    }}
+                                                                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 transition-all"
+                                                                >
+                                                                    Procesar
+                                                                </button>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!token) return;
+                                                                        const ok = await refundsApi.reject(refund.id, undefined, token);
+                                                                        if (ok) setAdminRefunds(prev => prev.map(r => r.id === refund.id ? { ...r, status: 'Rejected' } : r));
+                                                                    }}
+                                                                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/30 transition-all"
+                                                                >
+                                                                    Rechazar
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
                         </div>

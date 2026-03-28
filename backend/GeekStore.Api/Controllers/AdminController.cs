@@ -4,6 +4,7 @@ using GeekStore.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -228,6 +229,10 @@ namespace GeekStore.Api.Controllers
         public class ResolveDisputeRequest
         {
             public string Resolution { get; set; } = string.Empty;
+            public bool IssueRefund { get; set; } = false;
+            public decimal RefundAmount { get; set; } = 0m;
+            /// <summary>UserId of the refund beneficiary. Defaults to the dispute initiator if not specified.</summary>
+            public int? RefundBeneficiaryUserId { get; set; }
         }
 
         [HttpPut("disputes/{id}/resolve")]
@@ -238,6 +243,30 @@ namespace GeekStore.Api.Controllers
 
             dispute.Status = "Resolved";
             dispute.AdminResolution = request.Resolution;
+            dispute.ResolvedAt = System.DateTime.UtcNow;
+
+            // Optionally create a refund
+            if (request.IssueRefund && request.RefundAmount > 0)
+            {
+                var beneficiary = request.RefundBeneficiaryUserId ?? dispute.InitiatorUserId;
+                var refund = new GeekStore.Core.Entities.Refund
+                {
+                    DisputeId = dispute.Id,
+                    BeneficiaryUserId = beneficiary,
+                    Amount = request.RefundAmount,
+                    Status = "Pending",
+                    Notes = $"Emitido por resolución de disputa #{dispute.Id}"
+                };
+                _context.Refunds.Add(refund);
+
+                await _notificationRepo.AddAsync(new Notification
+                {
+                    UserId = beneficiary,
+                    Title = "Reembolso Emitido",
+                    Message = $"Se ha emitido un reembolso de ₡{request.RefundAmount:N0} relacionado a la orden #{dispute.OrderId}. El administrador lo procesará en breve.",
+                    Type = "System"
+                });
+            }
 
             await _notificationRepo.AddAsync(new Notification
             {
@@ -256,7 +285,84 @@ namespace GeekStore.Api.Controllers
             });
 
             await _context.SaveChangesAsync();
-            return Ok(new { message = "Disputa resuelta y usuarios notificados." });
+            return Ok(new { message = "Disputa resuelta y usuarios notificados.", refundCreated = request.IssueRefund && request.RefundAmount > 0 });
+        }
+
+        [HttpGet("refunds")]
+        public async Task<IActionResult> GetAllRefunds()
+        {
+            var refunds = await _context.Refunds
+                .Include(r => r.BeneficiaryUser)
+                .Include(r => r.Dispute)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new {
+                    id = r.Id,
+                    disputeId = r.DisputeId,
+                    orderId = r.Dispute!.OrderId,
+                    beneficiaryId = r.BeneficiaryUserId,
+                    beneficiaryNickname = r.BeneficiaryUser!.Nickname ?? r.BeneficiaryUser.Name,
+                    amount = r.Amount,
+                    status = r.Status,
+                    createdAt = r.CreatedAt,
+                    processedAt = r.ProcessedAt,
+                    notes = r.Notes
+                })
+                .ToListAsync();
+
+            return Ok(refunds);
+        }
+
+        public class ProcessRefundRequest
+        {
+            public string? Notes { get; set; }
+        }
+
+        [HttpPut("refunds/{id}/process")]
+        public async Task<IActionResult> ProcessRefund(int id, [FromBody] ProcessRefundRequest? request)
+        {
+            var refund = await _context.Refunds
+                .Include(r => r.BeneficiaryUser)
+                .FirstOrDefaultAsync(r => r.Id == id);
+            if (refund == null) return NotFound();
+
+            refund.Status = "Processed";
+            refund.ProcessedAt = System.DateTime.UtcNow;
+            if (!string.IsNullOrWhiteSpace(request?.Notes))
+                refund.Notes = request.Notes;
+
+            await _notificationRepo.AddAsync(new Notification
+            {
+                UserId = refund.BeneficiaryUserId,
+                Title = "Reembolso Procesado",
+                Message = $"Tu reembolso de ₡{refund.Amount:N0} ha sido procesado. Verifica tu método de pago original.",
+                Type = "System"
+            });
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Reembolso marcado como procesado." });
+        }
+
+        [HttpPut("refunds/{id}/reject")]
+        public async Task<IActionResult> RejectRefund(int id, [FromBody] ProcessRefundRequest? request)
+        {
+            var refund = await _context.Refunds.FindAsync(id);
+            if (refund == null) return NotFound();
+
+            refund.Status = "Rejected";
+            refund.ProcessedAt = System.DateTime.UtcNow;
+            if (!string.IsNullOrWhiteSpace(request?.Notes))
+                refund.Notes = request.Notes;
+
+            await _notificationRepo.AddAsync(new Notification
+            {
+                UserId = refund.BeneficiaryUserId,
+                Title = "Reembolso Rechazado",
+                Message = $"Tu solicitud de reembolso de ₡{refund.Amount:N0} fue revisada y no procede en esta ocasión.{(request?.Notes != null ? $" Nota: {request.Notes}" : "")}",
+                Type = "Alert"
+            });
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Reembolso marcado como rechazado." });
         }
 
         [HttpDelete("users/{id}")]

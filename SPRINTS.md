@@ -234,9 +234,7 @@
 
 ---
 
-## 🟡 SPRINT 4 — Sistema de Reembolsos y Apelaciones
-**Prioridad:** MEDIA
-**Estimación:** 5-7 días
+## ✅ SPRINT 4 — Sistema de Reembolsos y Apelaciones (COMPLETADO 2026-03-27)
 
 ### Backend — nuevos archivos
 - [ ] **[S]** `GeekStore.Core/Entities/Refund.cs`:
