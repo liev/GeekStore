@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m \"feat\\(S5\\): sistema de reportes de contenido:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
