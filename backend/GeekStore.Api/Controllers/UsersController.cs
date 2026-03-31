@@ -1,8 +1,8 @@
-using GeekStore.Core.Constants;
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Core.Models;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Constants;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Core.Models;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +12,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     public class UpgradeToSellerDto
     {
@@ -33,7 +33,7 @@ namespace GeekStore.Api.Controllers
         private readonly IUserFollowRepository _userFollowRepository;
         private readonly IProductRepository _productRepository;
         private readonly IPayPalService _payPalService;
-        private readonly GeekStoreDbContext _context;
+        private readonly GoblinSpotDbContext _context;
         private readonly ILogger<UsersController> _logger;
 
         public UsersController(
@@ -41,7 +41,7 @@ namespace GeekStore.Api.Controllers
             IUserFollowRepository userFollowRepository,
             IProductRepository productRepository,
             IPayPalService payPalService,
-            GeekStoreDbContext context,
+            GoblinSpotDbContext context,
             ILogger<UsersController> logger)
         {
             _userRepository = userRepository;

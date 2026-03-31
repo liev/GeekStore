@@ -2,7 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace GeekStore.Core.Entities
+namespace GoblinSpot.Core.Entities
 {
     public class Dispute
     {

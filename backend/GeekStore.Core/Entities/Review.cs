@@ -1,6 +1,6 @@
 using System;
 
-namespace GeekStore.Core.Entities
+namespace GoblinSpot.Core.Entities
 {
     /// <summary>
     /// Represents a buyer's review of a seller (1-5 stars + optional comment).

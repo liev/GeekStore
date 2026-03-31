@@ -1,8 +1,8 @@
-using GeekStore.Core.Entities;
+using GoblinSpot.Core.Entities;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace GeekStore.Core.Interfaces
+namespace GoblinSpot.Core.Interfaces
 {
     /// <summary>
     /// Repository contract for in-app notification operations.

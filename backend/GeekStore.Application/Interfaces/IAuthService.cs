@@ -1,7 +1,7 @@
-using GeekStore.Core.Entities;
+using GoblinSpot.Core.Entities;
 using System.Threading.Tasks;
 
-namespace GeekStore.Application.Interfaces
+namespace GoblinSpot.Application.Interfaces
 {
     public interface IAuthService
     {

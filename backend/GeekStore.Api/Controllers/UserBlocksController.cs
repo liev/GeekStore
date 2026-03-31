@@ -1,5 +1,5 @@
-using GeekStore.Core.Entities;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,16 +8,16 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
     public class UserBlocksController : ControllerBase
     {
-        private readonly GeekStoreDbContext _context;
+        private readonly GoblinSpotDbContext _context;
 
-        public UserBlocksController(GeekStoreDbContext context)
+        public UserBlocksController(GoblinSpotDbContext context)
         {
             _context = context;
         }

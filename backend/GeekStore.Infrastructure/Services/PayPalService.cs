@@ -1,11 +1,11 @@
-using GeekStore.Core.Interfaces;
+using GoblinSpot.Core.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-namespace GeekStore.Infrastructure.Services
+namespace GoblinSpot.Infrastructure.Services
 {
     public class PayPalService : IPayPalService
     {

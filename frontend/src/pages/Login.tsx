@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authApi, settingsApi, type SubscriptionPlan } from '../api/client';
+import { authApi, twoFactorApi, settingsApi, type SubscriptionPlan } from '../api/client';
 import { UserPlus } from 'lucide-react';
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
@@ -29,6 +29,12 @@ export default function Login() {
     // Payment State
     const [showPayment, setShowPayment] = useState(false);
 
+    // 2FA State
+    const [twoFAStep, setTwoFAStep] = useState(false);
+    const [twoFAUserId, setTwoFAUserId] = useState<number | null>(null);
+    const [twoFACode, setTwoFACode] = useState('');
+    const [twoFALoading, setTwoFALoading] = useState(false);
+
     // Email Verification State
     const [showVerification, setShowVerification] = useState(false);
     const [verifyEmail, setVerifyEmail] = useState('');
@@ -54,9 +60,12 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const token = await authApi.login(email, password);
-            if (token) {
-                localStorage.setItem('geekstore_token', token);
+            const result = await authApi.login(email, password);
+            if (result && typeof result === 'object' && 'requiresTwoFactor' in result) {
+                setTwoFAUserId(result.userId);
+                setTwoFAStep(true);
+            } else if (result && typeof result === 'string') {
+                localStorage.setItem('goblinspot_token', result);
                 navigate('/dashboard');
             } else {
                 setError('ACCESO DENEGADO: Credenciales inválidas');
@@ -73,6 +82,22 @@ export default function Login() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleTwoFASubmit = async () => {
+        if (!twoFAUserId || twoFACode.length < 6) return;
+        setError('');
+        setTwoFALoading(true);
+        try {
+            const result = await twoFactorApi.completeLogin(twoFAUserId, twoFACode);
+            if (result) {
+                localStorage.setItem('goblinspot_token', result.token);
+                navigate('/dashboard');
+            } else {
+                setError('Código 2FA inválido o expirado.');
+            }
+        } catch { setError('Error de conexión.'); }
+        finally { setTwoFALoading(false); }
     };
 
     const handleVerifyCode = async () => {
@@ -192,8 +217,42 @@ export default function Login() {
                     </p>
                 </div>
 
+                {/* ── 2FA Step ── */}
+                {twoFAStep && (
+                    <div className="glass-panel p-6 sm:p-8 rounded-2xl relative shadow-2xl border border-neon-yellow/40 text-center">
+                        <div className="text-4xl mb-4">🔐</div>
+                        <h2 className="text-2xl font-display font-bold text-neon-yellow mb-2">Verificación 2FA</h2>
+                        <p className="text-slate-300 font-sans text-sm mb-4">
+                            Ingresa el código de tu autenticador o uno de tus códigos de respaldo.
+                        </p>
+                        {error && (
+                            <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm mb-4">{error}</div>
+                        )}
+                        <input
+                            type="text"
+                            maxLength={8}
+                            placeholder="000000"
+                            value={twoFACode}
+                            onChange={e => setTwoFACode(e.target.value.replace(/\s/g, ''))}
+                            className="w-full text-center bg-slate-900 border-2 border-neon-yellow/50 focus:border-neon-yellow rounded-xl text-white font-retro text-3xl tracking-[0.5em] p-4 mb-4 focus:outline-none transition-colors"
+                            onKeyDown={e => e.key === 'Enter' && handleTwoFASubmit()}
+                            autoFocus
+                        />
+                        <button
+                            onClick={handleTwoFASubmit}
+                            disabled={twoFALoading || twoFACode.length < 6}
+                            className="w-full btn-primary py-3 text-base font-display font-bold uppercase tracking-wider mb-3 disabled:opacity-50"
+                        >
+                            {twoFALoading ? 'Verificando...' : 'Confirmar'}
+                        </button>
+                        <button onClick={() => { setTwoFAStep(false); setTwoFACode(''); setError(''); }} className="text-slate-400 hover:text-white text-sm font-sans transition-colors">
+                            ← Volver al login
+                        </button>
+                    </div>
+                )}
+
                 {/* ── Email Verification Screen ── */}
-                {showVerification && (
+                {!twoFAStep && showVerification && (
                     <div className="glass-panel p-6 sm:p-8 rounded-2xl relative shadow-2xl border border-neon-blue/40 text-center">
                         {verifySuccess ? (
                             <>
@@ -243,7 +302,7 @@ export default function Login() {
                     </div>
                 )}
 
-                {!showVerification && <div className="glass-panel p-6 sm:p-8 rounded-2xl relative shadow-2xl border border-slate-700/50">
+                {!twoFAStep && !showVerification && <div className="glass-panel p-6 sm:p-8 rounded-2xl relative shadow-2xl border border-slate-700/50">
                     <div className="flex justify-center mb-6 border-b border-slate-700 pb-2">
                         <button
                             className={`px-4 py-2 font-display font-bold ${!isRegistering ? 'text-neon-blue border-b-2 border-neon-blue' : 'text-slate-500 hover:text-white'}`}

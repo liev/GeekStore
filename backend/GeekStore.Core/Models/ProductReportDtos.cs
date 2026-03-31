@@ -1,6 +1,6 @@
 using System;
 
-namespace GeekStore.Core.Models
+namespace GoblinSpot.Core.Models
 {
     public class CreateProductReportRequest
     {

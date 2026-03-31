@@ -1,16 +1,16 @@
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace GeekStore.Infrastructure.Repositories
+namespace GoblinSpot.Infrastructure.Repositories
 {
     public class UserFollowRepository : Repository<UserFollow>, IUserFollowRepository
     {
-        public UserFollowRepository(GeekStoreDbContext dbContext) : base(dbContext)
+        public UserFollowRepository(GoblinSpotDbContext dbContext) : base(dbContext)
         {
         }
 

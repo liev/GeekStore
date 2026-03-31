@@ -1,7 +1,7 @@
-using GeekStore.Application.Interfaces;
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Application.Interfaces;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +9,7 @@ using System;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -18,9 +18,9 @@ namespace GeekStore.Api.Controllers
         private readonly IAuthService _authService;
         private readonly IEmailService _emailService;
         private readonly IRepository<User> _userRepository;
-        private readonly GeekStoreDbContext _context;
+        private readonly GoblinSpotDbContext _context;
 
-        public AuthController(IAuthService authService, IEmailService emailService, IRepository<User> userRepository, GeekStoreDbContext context)
+        public AuthController(IAuthService authService, IEmailService emailService, IRepository<User> userRepository, GoblinSpotDbContext context)
         {
             _authService = authService;
             _emailService = emailService;

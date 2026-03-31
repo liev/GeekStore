@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace GeekStore.Core.Interfaces
+namespace GoblinSpot.Core.Interfaces
 {
     public interface IRepository<T> where T : class
     {

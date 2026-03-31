@@ -1,10 +1,10 @@
-using GeekStore.Application.Interfaces;
-using GeekStore.Core.Models;
+using GoblinSpot.Application.Interfaces;
+using GoblinSpot.Core.Models;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace GeekStore.Infrastructure.Services
+namespace GoblinSpot.Infrastructure.Services
 {
     public class MoxfieldService : IMoxfieldService
     {

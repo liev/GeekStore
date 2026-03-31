@@ -66,7 +66,7 @@ export default function MyPurchases() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('geekstore_token');
+        const storedToken = localStorage.getItem('goblinspot_token');
         if (!storedToken) {
             navigate('/login');
             return;

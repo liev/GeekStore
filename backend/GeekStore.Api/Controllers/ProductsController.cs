@@ -1,15 +1,15 @@
-using GeekStore.Core.Constants;
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Core.Models;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Constants;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Core.Models;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using GeekStore.Application.Interfaces;
+using GoblinSpot.Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -19,14 +19,14 @@ namespace GeekStore.Api.Controllers
         private readonly ICloudinaryService _cloudinaryService;
         private readonly IImageValidationService _imageValidationService;
         private readonly IMoxfieldService _moxfieldService;
-        private readonly GeekStoreDbContext _context;
+        private readonly GoblinSpotDbContext _context;
 
         public ProductsController(
             IProductRepository productRepository,
             ICloudinaryService cloudinaryService,
             IImageValidationService imageValidationService,
             IMoxfieldService moxfieldService,
-            GeekStoreDbContext context)
+            GoblinSpotDbContext context)
         {
             _productRepository = productRepository;
             _cloudinaryService = cloudinaryService;
@@ -49,7 +49,7 @@ namespace GeekStore.Api.Controllers
 
             var maxProducts = GetPlanLimit(seller.SubscriptionPlan);
             var activeCount = await _context.Products
-                .CountAsync(p => p.SellerId == sellerId && p.IsActive && p.StockStatus == "Available");
+                .CountAsync(p => p.SellerId == sellerId && p.IsActive && p.StockStatus == "Available" && p.ListingType == "Sale");
 
             return Ok(new
             {
@@ -71,7 +71,7 @@ namespace GeekStore.Api.Controllers
         [HttpGet("debug-latest")]
         public async Task<IActionResult> GetDebugLatestProducts()
         {
-            var dbContext = HttpContext.RequestServices.GetRequiredService<GeekStore.Infrastructure.Data.GeekStoreDbContext>();
+            var dbContext = HttpContext.RequestServices.GetRequiredService<GoblinSpot.Infrastructure.Data.GoblinSpotDbContext>();
             var recent = await dbContext.Products
                 .Include(p => p.Seller)
                 .OrderByDescending(p => p.Id)
@@ -123,7 +123,7 @@ namespace GeekStore.Api.Controllers
                 if (maxProducts < int.MaxValue)
                 {
                     var activeCount = await _context.Products
-                        .CountAsync(p => p.SellerId == sellerId && p.IsActive && p.StockStatus == "Available");
+                        .CountAsync(p => p.SellerId == sellerId && p.IsActive && p.StockStatus == "Available" && p.ListingType == "Sale");
                     if (activeCount >= maxProducts)
                         return BadRequest(new { message = $"Límite de tu plan alcanzado ({maxProducts} productos activos). Mejora tu plan para publicar más." });
                 }

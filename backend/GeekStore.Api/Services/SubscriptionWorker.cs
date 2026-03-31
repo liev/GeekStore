@@ -2,15 +2,15 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace GeekStore.Api.Services
+namespace GoblinSpot.Api.Services
 {
     public class SubscriptionWorker : BackgroundService
     {
@@ -33,7 +33,7 @@ namespace GeekStore.Api.Services
                 {
                     using (var scope = _serviceProvider.CreateScope())
                     {
-                        var dbContext = scope.ServiceProvider.GetRequiredService<GeekStoreDbContext>();
+                        var dbContext = scope.ServiceProvider.GetRequiredService<GoblinSpotDbContext>();
                         var notificationRepo = scope.ServiceProvider.GetRequiredService<INotificationRepository>();
 
                         // Find sellers whose subscription has expired

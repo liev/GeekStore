@@ -3,13 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GeekStore.Core", "GeekStore.Core\GeekStore.Core.csproj", "{9F950BF5-B9EE-447E-B04A-019C0C52507D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoblinSpot.Core", "GeekStore.Core\GoblinSpot.Core.csproj", "{9F950BF5-B9EE-447E-B04A-019C0C52507D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GeekStore.Application", "GeekStore.Application\GeekStore.Application.csproj", "{FC018D92-CA63-4D74-B46C-EC15D4726395}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoblinSpot.Application", "GeekStore.Application\GoblinSpot.Application.csproj", "{FC018D92-CA63-4D74-B46C-EC15D4726395}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GeekStore.Infrastructure", "GeekStore.Infrastructure\GeekStore.Infrastructure.csproj", "{E42C0547-45AA-434A-824A-EDD42B06378E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoblinSpot.Infrastructure", "GeekStore.Infrastructure\GoblinSpot.Infrastructure.csproj", "{E42C0547-45AA-434A-824A-EDD42B06378E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GeekStore.Api", "GeekStore.Api\GeekStore.Api.csproj", "{99A25228-37AC-4964-8804-7F62A92A07DA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoblinSpot.Api", "GeekStore.Api\GoblinSpot.Api.csproj", "{99A25228-37AC-4964-8804-7F62A92A07DA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

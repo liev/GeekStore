@@ -1,12 +1,12 @@
-using GeekStore.Core.Interfaces;
-using GeekStore.Core.Models;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]

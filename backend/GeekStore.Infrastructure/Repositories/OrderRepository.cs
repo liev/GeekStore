@@ -1,17 +1,17 @@
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace GeekStore.Infrastructure.Repositories
+namespace GoblinSpot.Infrastructure.Repositories
 {
     public class OrderRepository : Repository<Order>, IOrderRepository
     {
-        public OrderRepository(GeekStoreDbContext dbContext) : base(dbContext)
+        public OrderRepository(GoblinSpotDbContext dbContext) : base(dbContext)
         {
         }
 

@@ -1,16 +1,16 @@
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Core.Models;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Core.Models;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace GeekStore.Infrastructure.Repositories
+namespace GoblinSpot.Infrastructure.Repositories
 {
     public class ProductReportRepository : Repository<ProductReport>, IProductReportRepository
     {
-        public ProductReportRepository(GeekStoreDbContext dbContext) : base(dbContext)
+        public ProductReportRepository(GoblinSpotDbContext dbContext) : base(dbContext)
         {
         }
 

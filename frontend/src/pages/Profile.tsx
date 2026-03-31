@@ -81,7 +81,7 @@ export default function Profile() {
     const [canReview, setCanReview] = useState(false);
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('geekstore_token');
+        const storedToken = localStorage.getItem('goblinspot_token');
         setToken(storedToken);
 
         const fetchData = async () => {
@@ -101,7 +101,7 @@ export default function Profile() {
                 setRatingSummary(summary);
 
                 // Check if this seller is blocked by current user
-                const storedToken2 = localStorage.getItem('geekstore_token');
+                const storedToken2 = localStorage.getItem('goblinspot_token');
                 if (storedToken2 && id) {
                     blocksApi.getMyBlockIds(storedToken2).then(ids => {
                         setIsBlocked(ids.includes(Number(id)));
@@ -237,10 +237,10 @@ export default function Profile() {
                         </button>
 
                         {/* Block/Unblock button — only show if viewing someone else's profile */}
-                        {localStorage.getItem('geekstore_token') && (() => {
+                        {localStorage.getItem('goblinspot_token') && (() => {
                             // Don't show on own profile
                             try {
-                                const payload = JSON.parse(atob(localStorage.getItem('geekstore_token')!.split('.')[1]));
+                                const payload = JSON.parse(atob(localStorage.getItem('goblinspot_token')!.split('.')[1]));
                                 const myId = parseInt(payload.sub || payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || '0');
                                 if (myId === Number(id)) return null;
                             } catch { /* ignore */ }
@@ -248,7 +248,7 @@ export default function Profile() {
                                 <button
                                     disabled={blockLoading}
                                     onClick={async () => {
-                                        const token = localStorage.getItem('geekstore_token');
+                                        const token = localStorage.getItem('goblinspot_token');
                                         if (!token) return;
                                         setBlockLoading(true);
                                         const result = isBlocked

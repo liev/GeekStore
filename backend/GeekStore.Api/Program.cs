@@ -1,9 +1,9 @@
-using GeekStore.Application.Interfaces;
-using GeekStore.Application.Services;
-using GeekStore.Core.Interfaces;
-using GeekStore.Infrastructure.Data;
-using GeekStore.Infrastructure.Repositories;
-using GeekStore.Infrastructure.Services;
+using GoblinSpot.Application.Interfaces;
+using GoblinSpot.Application.Services;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Infrastructure.Data;
+using GoblinSpot.Infrastructure.Repositories;
+using GoblinSpot.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -25,7 +25,7 @@ builder.Services.AddControllers()
 
 // Configure JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key must be configured. Set it in appsettings or environment variables.");
-var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "GeekStoreApi";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "GoblinSpotApi";
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -82,8 +82,8 @@ builder.Services.AddHealthChecks();
 // DI - Database (PostgreSQL)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? "Host=localhost;Port=5432;Database=geekstore;Username=geekstore;Password=geekstore123";
-builder.Services.AddDbContext<GeekStoreDbContext>(options =>
+    ?? "SET_VIA_ENV_VAR__";
+builder.Services.AddDbContext<GoblinSpotDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 // DI - Repositories
@@ -102,21 +102,21 @@ builder.Services.AddScoped<IImageValidationService, GeminiVisionService>();
 builder.Services.AddScoped<ISellerAnalysisService, GeminiSellerAnalysisService>();
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IMoxfieldService, MoxfieldService>();
-builder.Services.AddScoped<GeekStore.Core.Interfaces.IPayPalService, GeekStore.Infrastructure.Services.PayPalService>();
+builder.Services.AddScoped<GoblinSpot.Core.Interfaces.IPayPalService, GoblinSpot.Infrastructure.Services.PayPalService>();
 builder.Services.AddHttpClient<GeminiVisionService>();
 builder.Services.AddHttpClient<GeminiSellerAnalysisService>();
 builder.Services.AddHttpClient<MoxfieldService>();
-builder.Services.AddHttpClient<GeekStore.Infrastructure.Services.PayPalService>();
+builder.Services.AddHttpClient<GoblinSpot.Infrastructure.Services.PayPalService>();
 
 // Background Workers
-builder.Services.AddHostedService<GeekStore.Api.Services.SubscriptionWorker>();
+builder.Services.AddHostedService<GoblinSpot.Api.Services.SubscriptionWorker>();
 
 var app = builder.Build();
 
 // Auto-create/migrate the database on startup (dev convenience)
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<GeekStoreDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<GoblinSpotDbContext>();
     db.Database.EnsureCreated();
 }
 

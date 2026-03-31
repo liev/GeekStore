@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace GeekStore.Core.Entities
+namespace GoblinSpot.Core.Entities
 {
     public class Product
     {
@@ -28,6 +28,9 @@ namespace GeekStore.Core.Entities
         
         // "Available", "Sold", "Suspended"
         public string StockStatus { get; set; } = "Available";
+
+        // "Sale" | "Trade"
+        public string ListingType { get; set; } = "Sale";
         
         // Soft delete or hide from catalog when subscription ends/admin moderation
         public bool IsActive { get; set; } = true;

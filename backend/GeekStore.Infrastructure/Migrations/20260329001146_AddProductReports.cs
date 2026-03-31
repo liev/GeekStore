@@ -4,7 +4,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace GeekStore.Infrastructure.Migrations
+namespace GoblinSpot.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddProductReports : Migration

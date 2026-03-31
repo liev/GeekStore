@@ -1,11 +1,11 @@
 #if DEBUG
-using GeekStore.Core.Entities;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     /// <summary>
     /// Controlador de desarrollo para regenerar datos de prueba después de
@@ -18,9 +18,9 @@ namespace GeekStore.Api.Controllers
     [Authorize(Roles = "Admin")]
     public class SeedController : ControllerBase
     {
-        private readonly GeekStoreDbContext _db;
+        private readonly GoblinSpotDbContext _db;
 
-        public SeedController(GeekStoreDbContext db)
+        public SeedController(GoblinSpotDbContext db)
         {
             _db = db;
         }
@@ -88,6 +88,26 @@ namespace GeekStore.Api.Controllers
                 );
             ");
             return Ok(new { message = "UserBlocks table ready." });
+        }
+
+        [HttpPost("add-2fa-columns")]
+        public async Task<IActionResult> Add2FAColumns()
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""TwoFactorEnabled"" boolean NOT NULL DEFAULT false;
+                ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""TwoFactorSecret"" character varying(64) NULL;
+                ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""TwoFactorBackupCodes"" character varying(1000) NULL;
+            ");
+            return Ok(new { message = "2FA columns added to Users table." });
+        }
+
+        [HttpPost("add-listing-type-column")]
+        public async Task<IActionResult> AddListingTypeColumn()
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE ""Products"" ADD COLUMN IF NOT EXISTS ""ListingType"" varchar(10) NOT NULL DEFAULT 'Sale';
+            ");
+            return Ok(new { message = "ListingType column added to Products." });
         }
 
         [HttpPost("create-product-reports-table")]

@@ -1,19 +1,19 @@
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace GeekStore.Infrastructure.Repositories
+namespace GoblinSpot.Infrastructure.Repositories
 {
     /// <summary>
     /// EF Core implementation of IReviewRepository.
     /// </summary>
     public class ReviewRepository : Repository<Review>, IReviewRepository
     {
-        public ReviewRepository(GeekStoreDbContext dbContext) : base(dbContext)
+        public ReviewRepository(GoblinSpotDbContext dbContext) : base(dbContext)
         {
         }
 

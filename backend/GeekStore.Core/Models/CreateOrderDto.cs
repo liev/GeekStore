@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GeekStore.Core.Models
+namespace GoblinSpot.Core.Models
 {
     public class CreateOrderItemDto
     {

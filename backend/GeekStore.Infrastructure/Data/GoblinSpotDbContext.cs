@@ -1,0 +1,169 @@
+using GoblinSpot.Core.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace GoblinSpot.Infrastructure.Data
+{
+    public class GoblinSpotDbContext : DbContext
+    {
+        public GoblinSpotDbContext(DbContextOptions<GoblinSpotDbContext> options) : base(options)
+        {
+        }
+
+        public DbSet<User> Users { get; set; }
+        public DbSet<Product> Products { get; set; }
+        public DbSet<DeliveryPoint> DeliveryPoints { get; set; }
+        public DbSet<SystemSetting> SystemSettings { get; set; }
+        public DbSet<Category> Categories { get; set; }
+        public DbSet<Order> Orders { get; set; }
+        public DbSet<OrderItem> OrderItems { get; set; }
+        public DbSet<UserFollow> UserFollows { get; set; }
+        public DbSet<Review> Reviews { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+        public DbSet<Dispute> Disputes { get; set; }
+        public DbSet<Refund> Refunds { get; set; }
+        public DbSet<ProductReport> ProductReports { get; set; }
+        public DbSet<UserBlock> UserBlocks { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // Configure UserFollows PK and Relationships
+            modelBuilder.Entity<UserFollow>()
+                .HasKey(uf => new { uf.FollowerId, uf.FollowedId });
+
+            modelBuilder.Entity<UserFollow>()
+                .HasOne(uf => uf.Follower)
+                .WithMany()
+                .HasForeignKey(uf => uf.FollowerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<UserFollow>()
+                .HasOne(uf => uf.Followed)
+                .WithMany()
+                .HasForeignKey(uf => uf.FollowedId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure Review -> User relationships
+            modelBuilder.Entity<Review>()
+                .HasOne(r => r.Reviewer)
+                .WithMany()
+                .HasForeignKey(r => r.ReviewerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure Dispute -> User relationships
+            modelBuilder.Entity<Dispute>()
+                .HasOne(d => d.InitiatorUser)
+                .WithMany()
+                .HasForeignKey(d => d.InitiatorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Dispute>()
+                .HasOne(d => d.TargetUser)
+                .WithMany()
+                .HasForeignKey(d => d.TargetUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure Refund relationships
+            modelBuilder.Entity<Refund>()
+                .HasOne(r => r.Dispute)
+                .WithMany()
+                .HasForeignKey(r => r.DisputeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Refund>()
+                .HasOne(r => r.BeneficiaryUser)
+                .WithMany()
+                .HasForeignKey(r => r.BeneficiaryUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure ProductReport relationships
+            modelBuilder.Entity<ProductReport>()
+                .HasOne(pr => pr.Product)
+                .WithMany()
+                .HasForeignKey(pr => pr.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProductReport>()
+                .HasOne(pr => pr.ReporterUser)
+                .WithMany()
+                .HasForeignKey(pr => pr.ReporterUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // One report per user per product
+            modelBuilder.Entity<ProductReport>()
+                .HasIndex(pr => new { pr.ReporterUserId, pr.ProductId })
+                .IsUnique();
+
+            // Configure UserBlock
+            modelBuilder.Entity<UserBlock>()
+                .HasKey(ub => new { ub.BlockerId, ub.BlockedUserId });
+
+            modelBuilder.Entity<UserBlock>()
+                .HasOne(ub => ub.Blocker)
+                .WithMany()
+                .HasForeignKey(ub => ub.BlockerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<UserBlock>()
+                .HasOne(ub => ub.BlockedUser)
+                .WithMany()
+                .HasForeignKey(ub => ub.BlockedUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Review>()
+                .HasOne(r => r.Seller)
+                .WithMany()
+                .HasForeignKey(r => r.SellerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // One review per buyer-seller pair
+            modelBuilder.Entity<Review>()
+                .HasIndex(r => new { r.ReviewerId, r.SellerId })
+                .IsUnique();
+
+            // Configure Order -> User relationships to prevent multiple cascade paths
+            modelBuilder.Entity<Order>()
+                .HasOne(o => o.Buyer)
+                .WithMany()
+                .HasForeignKey(o => o.BuyerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure Notification -> User relationship
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.User)
+                .WithMany()
+                .HasForeignKey(n => n.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Order>()
+                .HasOne(o => o.Seller)
+                .WithMany()
+                .HasForeignKey(o => o.SellerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SystemSetting>().HasData(
+                new SystemSetting { Key = "SellerMonthlyFee", Value = "1.00" }
+            );
+
+            // Seed Categories
+            modelBuilder.Entity<Category>().HasData(
+                new Category { Id = 1, Name = "TCG" },
+                new Category { Id = 2, Name = "Figuras" },
+                new Category { Id = 3, Name = "Videojuegos" },
+                new Category { Id = 4, Name = "Cómics" },
+
+                // Seed Subcategories as Categories with ParentId
+                new Category { Id = 5, Name = "Cartas Sueltas", ParentId = 1 },
+                new Category { Id = 6, Name = "Cajas Selladas", ParentId = 1 },
+                new Category { Id = 7, Name = "Accesorios TCG", ParentId = 1 },
+                new Category { Id = 8, Name = "Anime", ParentId = 2 },
+                new Category { Id = 9, Name = "Funko Pop", ParentId = 2 },
+                new Category { Id = 10, Name = "Consolas Retro", ParentId = 3 },
+                new Category { Id = 11, Name = "Juegos Físicos", ParentId = 3 },
+                new Category { Id = 12, Name = "Marvel", ParentId = 4 },
+                new Category { Id = 13, Name = "Manga", ParentId = 4 }
+            );
+        }
+    }
+}

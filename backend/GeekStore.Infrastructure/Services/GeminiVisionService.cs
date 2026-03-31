@@ -1,13 +1,13 @@
 using System;
 using System.Text.Json;
 using System.Threading.Tasks;
-using GeekStore.Application.Interfaces;
+using GoblinSpot.Application.Interfaces;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 
-namespace GeekStore.Infrastructure.Services
+namespace GoblinSpot.Infrastructure.Services
 {
     public class GeminiVisionService : IImageValidationService
     {

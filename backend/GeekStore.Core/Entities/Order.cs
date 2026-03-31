@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GeekStore.Core.Entities
+namespace GoblinSpot.Core.Entities
 {
     public class Order
     {

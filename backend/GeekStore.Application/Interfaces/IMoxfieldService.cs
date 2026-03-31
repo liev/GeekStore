@@ -1,7 +1,7 @@
-using GeekStore.Core.Models;
+using GoblinSpot.Core.Models;
 using System.Threading.Tasks;
 
-namespace GeekStore.Application.Interfaces
+namespace GoblinSpot.Application.Interfaces
 {
     public interface IMoxfieldService
     {

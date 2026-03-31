@@ -3,7 +3,7 @@ const API_BASE_URL = 'http://localhost:5242/api';
 const fetchApi = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const res = await fetch(input, init);
     if (res.status === 401) {
-        localStorage.removeItem('geekstore_token');
+        localStorage.removeItem('goblinspot_token');
         if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
             window.location.href = '/login?expired=true';
         }
@@ -222,7 +222,7 @@ export const catalogApi = {
 };
 
 export const authApi = {
-    login: async (email: string, password: string): Promise<string | null> => {
+    login: async (email: string, password: string): Promise<string | { requiresTwoFactor: true; userId: number } | null> => {
         try {
             const res = await fetchApi(`${API_BASE_URL}/Auth/login`, {
                 method: 'POST',
@@ -238,6 +238,7 @@ export const authApi = {
                 return null;
             }
             const data = await res.json();
+            if (data.requiresTwoFactor) return { requiresTwoFactor: true, userId: data.userId };
             return data.token;
         } catch (error) {
             if (error instanceof Error && error.message === 'EMAIL_NOT_VERIFIED') {
@@ -737,6 +738,7 @@ export interface UserProfileDto {
     subscriptionPlan?: string;
     subscriptionEndDate?: string | null;
     autoRenew?: boolean;
+    twoFactorEnabled?: boolean;
 }
 
 export const usersApi = {
@@ -1166,5 +1168,51 @@ export const blocksApi = {
             if (!res.ok) return [];
             return await res.json();
         } catch { return []; }
+    }
+};
+
+export const twoFactorApi = {
+    setup: async (token: string): Promise<{ secret: string; otpAuthUrl: string } | null> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Auth/2fa/setup`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch { return null; }
+    },
+    activate: async (code: string, token: string): Promise<{ backupCodes: string[] } | null> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Auth/2fa/activate`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch { return null; }
+    },
+    disable: async (password: string, token: string): Promise<{ ok: boolean; message: string }> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Auth/2fa/disable`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            const data = await res.json().catch(() => ({}));
+            return { ok: res.ok, message: data.message ?? (res.ok ? '2FA desactivado.' : 'Error.') };
+        } catch { return { ok: false, message: 'Error de conexión.' }; }
+    },
+    completeLogin: async (userId: number, code: string): Promise<{ token: string; role: string; nickname: string; twoFactorEnabled: boolean } | null> => {
+        try {
+            const res = await fetchApi(`${API_BASE_URL}/Auth/2fa/complete-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, code })
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch { return null; }
     }
 };

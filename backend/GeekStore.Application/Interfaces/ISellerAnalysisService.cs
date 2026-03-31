@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using GeekStore.Core.Models;
+using GoblinSpot.Core.Models;
 
-namespace GeekStore.Application.Interfaces
+namespace GoblinSpot.Application.Interfaces
 {
     public interface ISellerAnalysisService
     {

@@ -1,4 +1,4 @@
-namespace GeekStore.Core.Interfaces
+namespace GoblinSpot.Core.Interfaces
 {
     public interface IPayPalService
     {

@@ -1,9 +1,9 @@
-using GeekStore.Core.Entities;
-using GeekStore.Core.Models;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace GeekStore.Core.Interfaces
+namespace GoblinSpot.Core.Interfaces
 {
     public interface IProductRepository : IRepository<Product>
     {

@@ -5,13 +5,13 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
-using GeekStore.Application.Interfaces;
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
+using GoblinSpot.Application.Interfaces;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
-namespace GeekStore.Application.Services
+namespace GoblinSpot.Application.Services
 {
     public class AuthService : IAuthService
     {
@@ -57,7 +57,7 @@ namespace GeekStore.Application.Services
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
             };
 
-            var issuer = _config["Jwt:Issuer"] ?? "GeekStoreApi";
+            var issuer = _config["Jwt:Issuer"] ?? "GoblinSpotApi";
 
             var token = new JwtSecurityToken(
                 issuer: issuer,

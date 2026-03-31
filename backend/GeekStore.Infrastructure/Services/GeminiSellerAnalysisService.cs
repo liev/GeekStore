@@ -4,11 +4,11 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using GeekStore.Application.Interfaces;
-using GeekStore.Core.Models;
+using GoblinSpot.Application.Interfaces;
+using GoblinSpot.Core.Models;
 using Microsoft.Extensions.Configuration;
 
-namespace GeekStore.Infrastructure.Services
+namespace GoblinSpot.Infrastructure.Services
 {
     public class GeminiSellerAnalysisService : ISellerAnalysisService
     {

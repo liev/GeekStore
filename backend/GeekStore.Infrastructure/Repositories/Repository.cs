@@ -1,16 +1,16 @@
-using GeekStore.Core.Interfaces;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace GeekStore.Infrastructure.Repositories
+namespace GoblinSpot.Infrastructure.Repositories
 {
     public class Repository<T> : IRepository<T> where T : class
     {
-        protected readonly GeekStoreDbContext _dbContext;
+        protected readonly GoblinSpotDbContext _dbContext;
 
-        public Repository(GeekStoreDbContext dbContext)
+        public Repository(GoblinSpotDbContext dbContext)
         {
             _dbContext = dbContext;
         }

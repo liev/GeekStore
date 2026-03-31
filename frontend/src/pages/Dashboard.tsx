@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Trash2, Box, Eye, Image as ImageIcon, ArrowUpDown, Pencil, X, Package, CheckCircle, Truck, PackageCheck } from 'lucide-react';
-import { catalogApi, sellersApi, settingsApi, usersApi, ordersApi, blocksApi, type Product, type Order, type SellerAnalyticsDto, type SubscriptionPlan, type BlockedUser } from '../api/client';
+import { catalogApi, sellersApi, settingsApi, usersApi, ordersApi, blocksApi, twoFactorApi, type Product, type Order, type SellerAnalyticsDto, type SubscriptionPlan, type BlockedUser } from '../api/client';
 import NotificationBell from '../components/NotificationBell';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
@@ -82,6 +82,15 @@ export default function Dashboard() {
     // Blocks State
     const [myBlocks, setMyBlocks] = useState<BlockedUser[]>([]);
     const [showBlocks, setShowBlocks] = useState(false);
+    // 2FA management state
+    const [show2FASection, setShow2FASection] = useState(false);
+    const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+    const [twoFASetupData, setTwoFASetupData] = useState<{ secret: string; otpAuthUrl: string } | null>(null);
+    const [twoFAActivateCode, setTwoFAActivateCode] = useState('');
+    const [twoFABackupCodes, setTwoFABackupCodes] = useState<string[]>([]);
+    const [twoFADisablePassword, setTwoFADisablePassword] = useState('');
+    const [twoFAMsg, setTwoFAMsg] = useState('');
+    const [twoFALoading, setTwoFALoading] = useState(false);
     const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
     
     const openEditModal = (p: Product) => {
@@ -123,7 +132,7 @@ export default function Dashboard() {
     });
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('geekstore_token');
+        const storedToken = localStorage.getItem('goblinspot_token');
         if (!storedToken) {
             navigate('/login');
             return;
@@ -139,7 +148,7 @@ export default function Dashboard() {
                 throw new Error("Invalid token format");
             }
         } catch {
-            localStorage.removeItem('geekstore_token');
+            localStorage.removeItem('goblinspot_token');
             navigate('/login');
         }
     }, [navigate]);
@@ -169,6 +178,7 @@ export default function Dashboard() {
                     ]);
 
                     setUserRole(me.role);
+                    setTwoFAEnabled(me.twoFactorEnabled ?? false);
                     setSubPlan(me.subscriptionPlan || 'Ninguno');
                     setSubEndDate(me.subscriptionEndDate || null);
                     setSubAutoRenew(me.autoRenew || false);
@@ -227,7 +237,7 @@ export default function Dashboard() {
         fetchMetrics();
 
         // Fetch blocked users
-        const storedToken = localStorage.getItem('geekstore_token');
+        const storedToken = localStorage.getItem('goblinspot_token');
         if (storedToken) {
             blocksApi.getMyBlocks(storedToken).then(setMyBlocks);
         }
@@ -288,7 +298,7 @@ export default function Dashboard() {
                         </button>
                         <button
                             onClick={() => {
-                                localStorage.removeItem('geekstore_token');
+                                localStorage.removeItem('goblinspot_token');
                                 navigate('/login');
                             }}
                             className="w-full md:w-auto glass-panel text-white font-sans font-medium px-5 py-3 sm:py-2 hover:bg-slate-800 transition-colors rounded-lg border border-slate-600/50"
@@ -1039,7 +1049,7 @@ export default function Dashboard() {
                                             try {
                                                 const msg = await usersApi.deleteAccount(token);
                                                 alert(msg);
-                                                localStorage.removeItem('geekstore_token');
+                                                localStorage.removeItem('goblinspot_token');
                                                 navigate('/login');
                                             } catch (err) {
                                                 alert(err instanceof Error ? err.message : 'Error al cerrar cuenta');
@@ -1155,6 +1165,136 @@ export default function Dashboard() {
 
                 </div>
 
+                {/* Two-Factor Authentication Section */}
+                <div className="mt-6 border border-slate-800 rounded-xl overflow-hidden">
+                    <button
+                        onClick={() => setShow2FASection(b => !b)}
+                        className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-800/30 transition-colors"
+                    >
+                        <span className="text-slate-400 text-sm font-semibold flex items-center gap-2">
+                            🔐 Autenticación de Dos Factores
+                            {twoFAEnabled && <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full">ACTIVO</span>}
+                        </span>
+                        <span className="text-slate-600 text-xs">{show2FASection ? '▲' : '▼'}</span>
+                    </button>
+                    {show2FASection && (
+                        <div className="p-4 border-t border-slate-800">
+                            {twoFAMsg && (
+                                <div className="bg-slate-800/50 text-slate-300 text-sm p-3 rounded-lg mb-4">{twoFAMsg}</div>
+                            )}
+                            {!twoFAEnabled ? (
+                                <>
+                                    {!twoFASetupData ? (
+                                        <div className="text-center">
+                                            <p className="text-slate-400 text-sm mb-4">
+                                                Protege tu cuenta con un autenticador como Google Authenticator o Authy.
+                                            </p>
+                                            <button
+                                                onClick={async () => {
+                                                    const token = localStorage.getItem('goblinspot_token');
+                                                    if (!token) return;
+                                                    setTwoFALoading(true);
+                                                    const data = await twoFactorApi.setup(token);
+                                                    setTwoFALoading(false);
+                                                    if (data) { setTwoFASetupData(data); setTwoFAMsg(''); }
+                                                    else setTwoFAMsg('Error al generar el código QR. Intenta de nuevo.');
+                                                }}
+                                                disabled={twoFALoading}
+                                                className="btn-primary px-6 py-2 text-sm font-display font-bold uppercase disabled:opacity-50"
+                                            >
+                                                {twoFALoading ? 'Generando...' : 'Configurar 2FA'}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center">
+                                            <p className="text-slate-300 text-sm mb-3">Escanea este código QR con tu autenticador:</p>
+                                            <img
+                                                src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(twoFASetupData.otpAuthUrl)}&size=180x180`}
+                                                alt="QR 2FA"
+                                                className="mx-auto rounded-lg mb-3 border border-slate-700"
+                                            />
+                                            <p className="text-slate-500 text-xs mb-1">O ingresa el código manualmente:</p>
+                                            <code className="text-neon-yellow text-xs font-mono bg-slate-900 px-3 py-1 rounded block mb-4 break-all">{twoFASetupData.secret}</code>
+                                            <p className="text-slate-300 text-sm mb-2">Confirma con el código de 6 dígitos de tu app:</p>
+                                            <input
+                                                type="text"
+                                                maxLength={6}
+                                                placeholder="000000"
+                                                value={twoFAActivateCode}
+                                                onChange={e => setTwoFAActivateCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                                className="w-full text-center bg-slate-900 border border-slate-600 rounded-lg text-white font-retro text-2xl tracking-widest p-3 mb-3 focus:outline-none focus:border-neon-yellow"
+                                            />
+                                            <button
+                                                onClick={async () => {
+                                                    const token = localStorage.getItem('goblinspot_token');
+                                                    if (!token || twoFAActivateCode.length !== 6) return;
+                                                    setTwoFALoading(true);
+                                                    const result = await twoFactorApi.activate(twoFAActivateCode, token);
+                                                    setTwoFALoading(false);
+                                                    if (result) {
+                                                        setTwoFAEnabled(true);
+                                                        setTwoFASetupData(null);
+                                                        setTwoFAActivateCode('');
+                                                        setTwoFABackupCodes(result.backupCodes);
+                                                        setTwoFAMsg('✅ 2FA activado correctamente.');
+                                                    } else {
+                                                        setTwoFAMsg('❌ Código inválido. Verifica que tu autenticador esté sincronizado.');
+                                                    }
+                                                }}
+                                                disabled={twoFALoading || twoFAActivateCode.length !== 6}
+                                                className="btn-primary px-6 py-2 text-sm font-display font-bold uppercase disabled:opacity-50"
+                                            >
+                                                {twoFALoading ? 'Verificando...' : 'Activar 2FA'}
+                                            </button>
+                                        </div>
+                                    )}
+                                    {twoFABackupCodes.length > 0 && (
+                                        <div className="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                                            <p className="text-yellow-400 text-sm font-bold mb-2">⚠ Códigos de respaldo — guárdalos ahora, no los verás de nuevo:</p>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {twoFABackupCodes.map((c, i) => (
+                                                    <code key={i} className="text-xs font-mono bg-slate-900 px-2 py-1 rounded text-slate-300">{c}</code>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div>
+                                    <p className="text-slate-400 text-sm mb-3">
+                                        2FA está activo en tu cuenta. Para desactivarlo, ingresa tu contraseña actual:
+                                    </p>
+                                    <input
+                                        type="password"
+                                        placeholder="Contraseña actual"
+                                        value={twoFADisablePassword}
+                                        onChange={e => setTwoFADisablePassword(e.target.value)}
+                                        className="w-full bg-slate-900 border border-slate-600 rounded-lg text-white p-3 mb-3 focus:outline-none focus:border-red-500 text-sm"
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            const token = localStorage.getItem('goblinspot_token');
+                                            if (!token || !twoFADisablePassword) return;
+                                            setTwoFALoading(true);
+                                            const result = await twoFactorApi.disable(twoFADisablePassword, token);
+                                            setTwoFALoading(false);
+                                            setTwoFAMsg(result.message);
+                                            if (result.ok) {
+                                                setTwoFAEnabled(false);
+                                                setTwoFADisablePassword('');
+                                            }
+                                        }}
+                                        disabled={twoFALoading || !twoFADisablePassword}
+                                        className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-400 px-5 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+                                    >
+                                        {twoFALoading ? 'Procesando...' : 'Desactivar 2FA'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {/* Blocked Users Section */}
                 <div className="mt-6 border border-slate-800 rounded-xl overflow-hidden">
                     <button
@@ -1185,7 +1325,7 @@ export default function Dashboard() {
                                             </div>
                                             <button
                                                 onClick={async () => {
-                                                    const token = localStorage.getItem('geekstore_token');
+                                                    const token = localStorage.getItem('goblinspot_token');
                                                     if (!token) return;
                                                     const { ok, message } = await blocksApi.unblock(b.blockedUserId, token);
                                                     if (ok) setMyBlocks(prev => prev.filter(x => x.blockedUserId !== b.blockedUserId));

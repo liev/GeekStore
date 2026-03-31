@@ -1,5 +1,5 @@
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -8,7 +8,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     /// <summary>DTO for creating or updating a seller review.</summary>
     public class CreateReviewDto

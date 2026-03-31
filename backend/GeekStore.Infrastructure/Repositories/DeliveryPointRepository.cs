@@ -1,16 +1,16 @@
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace GeekStore.Infrastructure.Repositories
+namespace GoblinSpot.Infrastructure.Repositories
 {
     public class DeliveryPointRepository : IDeliveryPointRepository
     {
-        private readonly GeekStoreDbContext _db;
-        public DeliveryPointRepository(GeekStoreDbContext db) { _db = db; }
+        private readonly GoblinSpotDbContext _db;
+        public DeliveryPointRepository(GoblinSpotDbContext db) { _db = db; }
 
         public async Task<IReadOnlyList<DeliveryPoint>> GetAllAsync() =>
             await _db.DeliveryPoints.ToListAsync();

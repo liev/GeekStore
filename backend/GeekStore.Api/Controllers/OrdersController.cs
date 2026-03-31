@@ -1,6 +1,6 @@
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Core.Models;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
@@ -9,7 +9,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -44,7 +44,7 @@ namespace GeekStore.Api.Controllers
                 return BadRequest("El carrito está vacío.");
 
             // Resolve all products securely from backend to avoid price/seller spoofing
-            var productsDb = new List<GeekStore.Core.Entities.Product>();
+            var productsDb = new List<GoblinSpot.Core.Entities.Product>();
             foreach (var item in request.Items)
             {
                 var prod = await _productRepository.GetByIdAsync(item.ProductId);

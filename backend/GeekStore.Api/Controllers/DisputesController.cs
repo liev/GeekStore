@@ -1,20 +1,20 @@
-using GeekStore.Core.Entities;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
     public class DisputesController : ControllerBase
     {
-        private readonly GeekStoreDbContext _context;
+        private readonly GoblinSpotDbContext _context;
 
-        public DisputesController(GeekStoreDbContext context)
+        public DisputesController(GoblinSpotDbContext context)
         {
             _context = context;
         }

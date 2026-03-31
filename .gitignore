@@ -46,3 +46,7 @@ build_errors*.txt
 build_output*.txt
 build_args.txt
 clean_errors.txt
+
+# ── QA / Reports ────────────────────────────
+qa-report.md
+QA_REPORT.md

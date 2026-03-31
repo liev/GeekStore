@@ -1,21 +1,21 @@
-using GeekStore.Core.Entities;
-using GeekStore.Core.Interfaces;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Entities;
+using GoblinSpot.Core.Interfaces;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Admin")]
     public class AdminController : ControllerBase
     {
-        private readonly GeekStoreDbContext _context;
+        private readonly GoblinSpotDbContext _context;
         private readonly INotificationRepository _notificationRepo;
 
-        public AdminController(GeekStoreDbContext context, INotificationRepository notificationRepo)
+        public AdminController(GoblinSpotDbContext context, INotificationRepository notificationRepo)
         {
             _context = context;
             _notificationRepo = notificationRepo;
@@ -247,7 +247,7 @@ namespace GeekStore.Api.Controllers
             if (request.IssueRefund && request.RefundAmount > 0)
             {
                 var beneficiary = request.RefundBeneficiaryUserId ?? dispute.InitiatorUserId;
-                var refund = new GeekStore.Core.Entities.Refund
+                var refund = new GoblinSpot.Core.Entities.Refund
                 {
                     DisputeId = dispute.Id,
                     BeneficiaryUserId = beneficiary,
@@ -385,6 +385,21 @@ namespace GeekStore.Api.Controllers
 
             await _context.SaveChangesAsync();
             return Ok(new { message = "Usuario cerrado permanentemente por la administración." });
+        }
+
+        [HttpGet("users/{id}/blocks")]
+        public async Task<IActionResult> GetUserBlocks(int id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
+
+            var blocks = await _context.UserBlocks
+                .Where(b => b.BlockerId == id)
+                .Include(b => b.BlockedUser)
+                .Select(b => new { b.BlockedUserId, nickname = b.BlockedUser!.Nickname, b.CreatedAt })
+                .ToListAsync();
+
+            return Ok(blocks);
         }
 
         // ── Product Reports ───────────────────────────────────────────────

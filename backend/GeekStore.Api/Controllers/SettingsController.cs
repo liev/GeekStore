@@ -1,5 +1,5 @@
-using GeekStore.Core.Constants;
-using GeekStore.Infrastructure.Data;
+using GoblinSpot.Core.Constants;
+using GoblinSpot.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -7,16 +7,16 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace GeekStore.Api.Controllers
+namespace GoblinSpot.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     public class SettingsController : ControllerBase
     {
-        private readonly GeekStoreDbContext _context;
+        private readonly GoblinSpotDbContext _context;
         private readonly IConfiguration _config;
 
-        public SettingsController(GeekStoreDbContext context, IConfiguration config)
+        public SettingsController(GoblinSpotDbContext context, IConfiguration config)
         {
             _context = context;
             _config = config;
@@ -121,7 +121,7 @@ namespace GeekStore.Api.Controllers
             var setting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.Key == key);
             if (setting == null)
             {
-                setting = new GeekStore.Core.Entities.SystemSetting { Key = key, Value = request.CrcPrice.ToString() };
+                setting = new GoblinSpot.Core.Entities.SystemSetting { Key = key, Value = request.CrcPrice.ToString() };
                 _context.SystemSettings.Add(setting);
             }
             else

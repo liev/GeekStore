@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace GeekStore.Application.Interfaces
+namespace GoblinSpot.Application.Interfaces
 {
     public interface IEmailService
     {

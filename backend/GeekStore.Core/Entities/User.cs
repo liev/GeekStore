@@ -1,7 +1,7 @@
 using System;
 using System.Text.Json.Serialization;
 
-namespace GeekStore.Core.Entities
+namespace GoblinSpot.Core.Entities
 {
     public class User
     {
@@ -39,5 +39,13 @@ namespace GeekStore.Core.Entities
         public bool AutoRenew { get; set; } = false;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        // ── Two-Factor Authentication ──────────────────────────────────
+        public bool TwoFactorEnabled { get; set; } = false;
+        [JsonIgnore]
+        public string? TwoFactorSecret { get; set; }
+        /// <summary>JSON array of one-time backup codes (BCrypt-hashed).</summary>
+        [JsonIgnore]
+        public string? TwoFactorBackupCodes { get; set; }
     }
 }

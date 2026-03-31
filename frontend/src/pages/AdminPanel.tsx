@@ -278,7 +278,7 @@ export default function AdminPanel() {
     });
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('geekstore_token');
+        const storedToken = localStorage.getItem('goblinspot_token');
         if (!storedToken) {
             navigate('/login');
             return;
@@ -294,7 +294,7 @@ export default function AdminPanel() {
             }
             setToken(storedToken);
         } catch {
-            localStorage.removeItem('geekstore_token');
+            localStorage.removeItem('goblinspot_token');
             navigate('/login');
         }
     }, [navigate]);

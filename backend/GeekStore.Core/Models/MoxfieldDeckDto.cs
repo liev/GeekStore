@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace GeekStore.Core.Models
+namespace GoblinSpot.Core.Models
 {
     public class MoxfieldDeckDto
     {

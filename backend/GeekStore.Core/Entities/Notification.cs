@@ -1,6 +1,6 @@
 using System;
 
-namespace GeekStore.Core.Entities
+namespace GoblinSpot.Core.Entities
 {
     /// <summary>
     /// Represents an in-app notification for a user.

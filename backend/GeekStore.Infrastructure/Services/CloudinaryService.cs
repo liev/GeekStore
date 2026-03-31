@@ -1,11 +1,11 @@
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
-using GeekStore.Application.Interfaces;
+using GoblinSpot.Application.Interfaces;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace GeekStore.Infrastructure.Services
+namespace GoblinSpot.Infrastructure.Services
 {
     public class CloudinaryService : ICloudinaryService
     {
@@ -37,7 +37,7 @@ namespace GeekStore.Infrastructure.Services
             var uploadParams = new ImageUploadParams()
             {
                 File = new FileDescription(fileName, fileStream),
-                Folder = "geekstore_flea_market"
+                Folder = "goblinspot_flea_market"
             };
 
             var uploadResult = await _cloudinary.UploadAsync(uploadParams);

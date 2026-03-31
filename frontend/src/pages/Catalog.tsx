@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ShoppingCart, User, SlidersHorizontal, ChevronDown, X, MessageCircle, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { catalogApi, categoriesApi, ordersApi, deliveryPointsApi, reviewsApi, reportsApi, type Product, type Category as ApiCategory, type OrderSellerInfo, type ReviewSummary, type DeliveryPoint } from '../api/client';
+import { catalogApi, categoriesApi, ordersApi, deliveryPointsApi, reviewsApi, reportsApi, blocksApi, type Product, type Category as ApiCategory, type OrderSellerInfo, type ReviewSummary, type DeliveryPoint } from '../api/client';
 import { StarRatingCompact } from './Profile';
 import NotificationBell from '../components/NotificationBell';
 export interface CartItem {
@@ -186,6 +186,7 @@ export default function Catalog() {
     const [reportReason, setReportReason] = useState('Spam');
     const [reportDetails, setReportDetails] = useState('');
     const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+    const [blockedSellerIds, setBlockedSellerIds] = useState<Set<number>>(new Set());
 
     const saveInterests = () => {
         localStorage.setItem('gs_interests', JSON.stringify([...tempInterests]));
@@ -240,7 +241,7 @@ export default function Catalog() {
             try {
                 let res;
                 if (activeCategory === 'following') {
-                    const token = localStorage.getItem('geekstore_token');
+                    const token = localStorage.getItem('goblinspot_token');
                     if (!token) {
                         alert("Debes iniciar sesión para ver tu feed personalizado.");
                         setActiveCategory(null);
@@ -269,6 +270,10 @@ export default function Catalog() {
             }
         };
         fetchCatalog();
+        const token = localStorage.getItem('goblinspot_token');
+        if (token) {
+            blocksApi.getMyBlockIds(token).then(ids => setBlockedSellerIds(new Set(ids))).catch(() => {});
+        }
         return () => { isMounted = false; };
     }, [debouncedSearch, activeCategory, conditionFilter, page]);
 
@@ -289,7 +294,7 @@ export default function Catalog() {
     }, [products]);
 
     const openCheckout = () => {
-        const token = localStorage.getItem('geekstore_token');
+        const token = localStorage.getItem('goblinspot_token');
         if (!token) {
             alert("Debes iniciar sesión o crear una cuenta para comprar (Seguridad P2P).");
             navigate('/login');
@@ -312,7 +317,7 @@ export default function Catalog() {
     const handlePlaceOrder = async () => {
         if (!buyerName.trim() || !buyerEmail.trim()) return;
 
-        const token = localStorage.getItem('geekstore_token');
+        const token = localStorage.getItem('goblinspot_token');
         if (!token) {
             navigate('/login');
             return;
@@ -374,9 +379,10 @@ export default function Catalog() {
     });
 
     // Apply seller filter client-side (filters within current page)
-    const filteredProducts = sellerFilter.size > 0
+    const filteredProducts = (sellerFilter.size > 0
         ? sortedProducts.filter(p => p.seller?.nickname && sellerFilter.has(p.seller.nickname))
-        : sortedProducts;
+        : sortedProducts
+    ).filter(p => !blockedSellerIds.has(p.sellerId));
 
     // Root categories for pills
     const rootCategories = categories.filter(c => !c.parentId);
@@ -403,7 +409,7 @@ export default function Catalog() {
                         >
                             ✦ {userInterests.size > 0 ? `Mis intereses (${userInterests.size})` : 'Personalizar'}
                         </button>
-                        {(() => { const t = localStorage.getItem('geekstore_token'); return t ? <NotificationBell token={t} /> : null; })()}
+                        {(() => { const t = localStorage.getItem('goblinspot_token'); return t ? <NotificationBell token={t} /> : null; })()}
                         <button onClick={() => navigate('/login')} className="w-full sm:w-auto glass-panel text-white font-sans font-medium px-5 py-2.5 rounded-lg hover:bg-slate-800 transition-colors border border-slate-600/50">
                             Acceso a Vendedores
                         </button>
@@ -958,7 +964,7 @@ export default function Catalog() {
                                 <button
                                     disabled={isSubmittingReport}
                                     onClick={async () => {
-                                        const token = localStorage.getItem('geekstore_token');
+                                        const token = localStorage.getItem('goblinspot_token');
                                         if (!token) { alert('Debes iniciar sesión para reportar.'); return; }
                                         setIsSubmittingReport(true);
                                         const { ok, message } = await reportsApi.report(reportTarget.id, reportReason, reportDetails || undefined, token);

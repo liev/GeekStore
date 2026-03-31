@@ -1,4 +1,4 @@
-namespace GeekStore.Core.Constants
+namespace GoblinSpot.Core.Constants
 {
     /// <summary>
     /// Jerarquía de planes Goblin Spot. Precios fijos en CRC (tipo de cambio ~450 CRC/USD).

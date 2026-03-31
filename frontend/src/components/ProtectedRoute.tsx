@@ -14,7 +14,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-    const token = localStorage.getItem('geekstore_token');
+    const token = localStorage.getItem('goblinspot_token');
 
     if (!token) return <Navigate to="/login" replace />;
 
@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
         // Check expiration
         if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-            localStorage.removeItem('geekstore_token');
+            localStorage.removeItem('goblinspot_token');
             return <Navigate to="/login?expired=true" replace />;
         }
 
@@ -35,7 +35,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
         return <>{children}</>;
     } catch {
-        localStorage.removeItem('geekstore_token');
+        localStorage.removeItem('goblinspot_token');
         return <Navigate to="/login" replace />;
     }
 }
