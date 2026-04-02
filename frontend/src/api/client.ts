@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5242/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5242/api';
 
 const fetchApi = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const res = await fetch(input, init);

@@ -119,11 +119,14 @@ builder.Services.AddHostedService<GoblinSpot.Api.Services.SubscriptionWorker>();
 
 var app = builder.Build();
 
-// Auto-create/migrate the database on startup (dev convenience)
+// Auto-create/migrate the database on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GoblinSpotDbContext>();
-    db.Database.EnsureCreated();
+    if (app.Environment.IsDevelopment())
+        db.Database.EnsureCreated();
+    else
+        db.Database.Migrate();
 }
 
 app.UseHttpsRedirection();

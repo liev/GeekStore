@@ -4,42 +4,63 @@ services:
   # ── PostgreSQL Database ──────────────────────────────
   postgres-db:
     image: postgres:15-alpine
-    container_name: geekstore-db
+    container_name: goblinspot-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: geekstore
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geekstore123}
-      POSTGRES_DB: geekstore
+      POSTGRES_USER: ${POSTGRES_USER:-geekstore}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-geekstore}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-geekstore}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ── Backend (.NET 9 API) ──────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: geekstore-api
+    container_name: goblinspot-api
     restart: unless-stopped
     environment:
+      ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5242
-      DATABASE_URL: Host=postgres-db;Port=5432;Database=geekstore;Username=geekstore;Password=geekstore123
-      AllowedOrigins: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      DATABASE_URL: "Host=postgres-db;Port=5432;Database=${POSTGRES_DB:-geekstore};Username=${POSTGRES_USER:-geekstore};Password=${POSTGRES_PASSWORD}"
+      Jwt__Key: ${JWT_KEY:?JWT_KEY is required}
+      Jwt__Issuer: ${JWT_ISSUER:-GoblinSpotApi}
+      AllowedOrigins: ${ALLOWED_ORIGINS:-https://goblinspot.com}
+      Gemini__ApiKey: ${GEMINI_API_KEY:-not_set}
+      Cloudinary__CloudName: ${CLOUDINARY_CLOUD_NAME:-not_set}
+      Cloudinary__ApiKey: ${CLOUDINARY_API_KEY:-not_set}
+      Cloudinary__ApiSecret: ${CLOUDINARY_API_SECRET:-not_set}
+      Email__SmtpUser: ${SMTP_USER:-not_set}
+      Email__SmtpPass: ${SMTP_PASSWORD:-not_set}
+      Email__FromEmail: ${SMTP_USER:-not_set}
+      PayPal__ClientId: ${PAYPAL_CLIENT_ID:-not_set}
+      PayPal__ClientSecret: ${PAYPAL_CLIENT_SECRET:-not_set}
+      PayPal__Mode: ${PAYPAL_MODE:-sandbox}
     ports:
-      - "5242:5242"
+      - "127.0.0.1:5242:5242"
     depends_on:
-      - postgres-db
+      postgres-db:
+        condition: service_healthy
 
   # ── Frontend (React + Vite served by Nginx) ───────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: geekstore-front
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.goblinspot.com/api}
+    container_name: goblinspot-front
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - backend
 
