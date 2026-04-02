@@ -29,6 +29,7 @@ export interface Product {
     imageUrl2?: string;
     imageUrl3?: string;
     stockStatus: string;
+    listingType?: 'Sale' | 'Trade';
     sellerId: number;
     seller?: Seller;
     isMoxfieldCollection?: boolean;

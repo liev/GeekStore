@@ -34,7 +34,7 @@ namespace GoblinSpot.Api.Controllers
         public async Task<IActionResult> GetInventoryStats()
         {
             var users = await _userRepository.ListAllAsync();
-            var sellers = users.Where(u => u.Role == "Seller").ToList();
+            var sellers = users.Where(u => u.Role == "Goblin Worker" || u.Role == "Goblin Mage" || u.Role == "Goblin Warlord" || u.Role == "Goblin King").ToList();
             var allProducts = await _productRepository.ListAllAsync();
 
             var stats = new AdminInventoryStatsDto();

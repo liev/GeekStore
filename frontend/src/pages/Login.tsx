@@ -19,7 +19,7 @@ export default function Login() {
     const [regNickname, setRegNickname] = useState('');
     const [regEmail, setRegEmail] = useState('');
     const [regPassword, setRegPassword] = useState('');
-    const [regRole, setRegRole] = useState<'Seller' | 'Buyer'>('Buyer');
+    const [regRole, setRegRole] = useState<string>('Forastero');
 
     // Plan selection
     const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
@@ -139,7 +139,7 @@ export default function Login() {
             setError('Faltan campos obligatorios');
             return;
         }
-        if (regRole === 'Seller') {
+        if (regRole !== 'Forastero') {
             if (!selectedPlan) { setError('Selecciona un plan'); return; }
             setShowPayment(true);
         } else {
@@ -412,23 +412,23 @@ export default function Login() {
                             <div className="space-y-1.5">
                                 <label className="block text-slate-300 font-sans font-medium text-xs uppercase tracking-wider">TIPO DE CUENTA</label>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <button type="button" onClick={() => setRegRole('Buyer')}
-                                        className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all text-xs font-bold ${regRole === 'Buyer' ? 'border-neon-blue bg-neon-blue/10 text-neon-blue' : 'border-slate-700 text-slate-400 hover:border-slate-500'}`}>
+                                    <button type="button" onClick={() => setRegRole('Forastero')}
+                                        className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all text-xs font-bold ${regRole === 'Forastero' ? 'border-neon-blue bg-neon-blue/10 text-neon-blue' : 'border-slate-700 text-slate-400 hover:border-slate-500'}`}>
                                         <span className="text-xl mb-1">🛒</span>
-                                        <span>COMPRADOR</span>
-                                        <span className="font-sans font-normal text-green-400 text-[10px] mt-0.5">Gratis</span>
+                                        <span>FORASTERO</span>
+                                        <span className="font-sans font-normal text-green-400 text-[10px] mt-0.5">Gratis — solo compras</span>
                                     </button>
-                                    <button type="button" onClick={() => setRegRole('Seller')}
-                                        className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all text-xs font-bold ${regRole === 'Seller' ? 'border-neon-pink bg-neon-pink/10 text-neon-pink' : 'border-slate-700 text-slate-400 hover:border-slate-500'}`}>
+                                    <button type="button" onClick={() => setRegRole('Goblin Worker')}
+                                        className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all text-xs font-bold ${regRole !== 'Forastero' ? 'border-neon-pink bg-neon-pink/10 text-neon-pink' : 'border-slate-700 text-slate-400 hover:border-slate-500'}`}>
                                         <span className="text-xl mb-1">⚔</span>
-                                        <span>VENDEDOR</span>
+                                        <span>MERCADER</span>
                                         <span className="font-sans font-normal text-neon-pink text-[10px] mt-0.5">desde ₡{plans[0]?.crcPrice.toLocaleString('es-CR') ?? '...'}/mes</span>
                                     </button>
                                 </div>
                             </div>
 
                             {/* Plan cards — only shown when Seller is selected */}
-                            {regRole === 'Seller' && plans.length > 0 && (
+                            {regRole !== 'Forastero' && plans.length > 0 && (
                                 <div className="space-y-1.5">
                                     <label className="block text-slate-300 font-sans font-medium text-xs uppercase tracking-wider">ELIGE TU PLAN</label>
                                     <div className="grid grid-cols-2 gap-2">
@@ -436,7 +436,7 @@ export default function Login() {
                                             <button
                                                 key={plan.name}
                                                 type="button"
-                                                onClick={() => setSelectedPlan(plan)}
+                                                onClick={() => { setSelectedPlan(plan); setRegRole(plan.name); }}
                                                 className={`flex flex-col items-start p-3 rounded-xl border-2 transition-all text-left ${selectedPlan?.name === plan.name ? 'border-neon-pink bg-neon-pink/10' : 'border-slate-700 hover:border-slate-500 bg-slate-900/30'}`}
                                             >
                                                 <div className="flex items-center gap-1.5 mb-1">
@@ -490,7 +490,7 @@ export default function Login() {
                             <button type="submit"
                                 className="w-full mt-4 flex justify-center items-center gap-2 bg-gradient-to-r from-neon-pink to-purple-600 text-white font-sans font-bold text-lg py-3 rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-1 hover:shadow-neon-pink/40">
                                 <UserPlus size={20} />
-                                {regRole === 'Seller' ? 'CONTINUAR AL PAGO' : 'CREAR CUENTA'}
+                                {regRole !== 'Forastero' ? 'CONTINUAR AL PAGO' : 'CREAR CUENTA'}
                             </button>
                         </form>
                     )}

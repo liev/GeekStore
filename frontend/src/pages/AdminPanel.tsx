@@ -822,7 +822,7 @@ export default function AdminPanel() {
                                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${user.isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
                                                             {user.isActive ? 'ACTIVO' : 'SUSPENDIDO'}
                                                         </span>
-                                                        {user.role === 'Seller' && user.subscriptionPlan && (
+                                                        {['Goblin Worker','Goblin Mage','Goblin Warlord','Goblin King'].includes(user.role) && user.subscriptionPlan && (
                                                             <span className="text-[10px] text-neon-pink mt-1">{user.subscriptionPlan}</span>
                                                         )}
                                                     </div>
@@ -844,7 +844,7 @@ export default function AdminPanel() {
                                                         onClick={() => handleGrantPlan(user.id)}
                                                         className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all w-32 bg-yellow-400/20 text-yellow-400 hover:bg-yellow-400 hover:text-slate-900 border border-yellow-400/50 flex items-center justify-center gap-2"
                                                     >
-                                                        {user.role === 'Seller' ? 'EDITAR PLAN' : 'ASIGNAR PLAN'}
+                                                        {['Goblin Worker','Goblin Mage','Goblin Warlord','Goblin King'].includes(user.role) ? 'EDITAR PLAN' : 'ASIGNAR PLAN'}
                                                     </button>
                                                     <button
                                                         onClick={async () => {

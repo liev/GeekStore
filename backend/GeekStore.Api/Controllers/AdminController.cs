@@ -63,7 +63,8 @@ namespace GoblinSpot.Api.Controllers
             var user = await _context.Users.FindAsync(id);
             if (user == null) return NotFound();
 
-            user.Role = "Seller";
+            // El rol es el nombre del plan (Goblin Worker, Goblin Mage, etc.)
+            user.Role = request.Plan;
             user.SubscriptionPlan = request.Plan;
             user.SubscriptionEndDate = request.EndDate;
             user.AutoRenew = false;
@@ -105,7 +106,7 @@ namespace GoblinSpot.Api.Controllers
             // Notification to all sellers if fee increased
             if (request.NewFee > oldFee)
             {
-                var sellers = await _context.Users.Where(u => u.Role == "Seller").ToListAsync();
+                var sellers = await _context.Users.Where(u => u.Role == "Goblin Worker" || u.Role == "Goblin Mage" || u.Role == "Goblin Warlord" || u.Role == "Goblin King").ToListAsync();
                 foreach (var seller in sellers)
                 {
                     await _notificationRepo.AddAsync(new Notification

@@ -166,11 +166,11 @@ namespace GoblinSpot.Api.Controllers
                 Nickname = "DragonTrader",
                 Email = "carlos@test.com",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("test123"),
-                Role = "Seller",
+                Role = "Goblin Worker",
                 IsActive = true,
                 IsVerified = true,
                 PhoneNumber = "+50687654321",
-                SubscriptionPlan = "Licencia Mercante",
+                SubscriptionPlan = "Goblin Worker",
                 SubscriptionEndDate = System.DateTime.UtcNow.AddDays(30),
                 AutoRenew = true
             };
@@ -182,11 +182,12 @@ namespace GoblinSpot.Api.Controllers
                 Nickname = "MagicQueen",
                 Email = "maria@test.com",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("test123"),
+                Role = "Goblin Mage",
                 IsActive = true,
                 IsVerified = true,
                 PhoneNumber = "+50611223344",
-                SubscriptionPlan = "Licencia de Prueba",
-                SubscriptionEndDate = System.DateTime.UtcNow.AddMinutes(-1), // Expired! Worker should catch this
+                SubscriptionPlan = "Goblin Mage",
+                SubscriptionEndDate = System.DateTime.UtcNow.AddMinutes(-1), // Expirada — el Worker la detecta
                 AutoRenew = false
             };
 
@@ -197,7 +198,7 @@ namespace GoblinSpot.Api.Controllers
                 Nickname = "GoblinBuyer",
                 Email = "luis@test.com",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("test123"),
-                Role = "Buyer",
+                Role = "Forastero",
                 IsActive = true,
                 IsVerified = true,
                 PhoneNumber = "+50699998888"
@@ -240,7 +241,7 @@ namespace GoblinSpot.Api.Controllers
                     Name = "Booster Box - Aetherdrift",
                     Description = "Caja sellada de 36 sobres de la última expansión de MTG.",
                     PriceCRC = 85000,
-                    ImageUrl = "https://images.unsplash.com/photo-1626544827763-d516dce335e2?w=400&q=80",
+                    ImageUrl = "https://images.unsplash.com/photo-1642480618739-4093b3763757?w=400&q=80",
                     StockStatus = "Available",
                     StockCount = 3,
                     Condition = "M"
@@ -252,7 +253,7 @@ namespace GoblinSpot.Api.Controllers
                     Name = "Figura Goku Ultra Instinct 25cm",
                     Description = "Figura de acción de Dragon Ball Super. Articulada, base incluida.",
                     PriceCRC = 28000,
-                    ImageUrl = "https://images.unsplash.com/photo-1608889825205-eebdb9fc5806?w=400&q=80",
+                    ImageUrl = "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?w=400&q=80",
                     StockStatus = "Available",
                     StockCount = 1,
                     Condition = "M"
@@ -264,7 +265,7 @@ namespace GoblinSpot.Api.Controllers
                     Name = "Funko Pop! Pikachu #353",
                     Description = "Funko Pop de Pokémon, edición regular. Caja en perfecto estado.",
                     PriceCRC = 12000,
-                    ImageUrl = "https://images.unsplash.com/photo-1609372332255-611485350f25?w=400&q=80",
+                    ImageUrl = "https://images.unsplash.com/photo-1613460790067-c03f0e52dc1e?w=400&q=80",
                     StockStatus = "Available",
                     StockCount = 4,
                     Condition = "NM"
@@ -276,7 +277,7 @@ namespace GoblinSpot.Api.Controllers
                     Name = "Manga One Piece Vol. 1-5 Bundle",
                     Description = "Tomos 1 al 5 de One Piece en español. Lomo con uso mínimo.",
                     PriceCRC = 22000,
-                    ImageUrl = "https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=400&q=80",
+                    ImageUrl = "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400&q=80",
                     StockStatus = "Available",
                     StockCount = 1,
                     Condition = "LP"
@@ -300,7 +301,7 @@ namespace GoblinSpot.Api.Controllers
                     Name = "Deck Box Ultra Pro (Satin Tower)",
                     Description = "Caja para mazos con compartimento para dados. Color negro.",
                     PriceCRC = 9500,
-                    ImageUrl = "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=400&q=80",
+                    ImageUrl = "https://images.unsplash.com/photo-1611891487122-207579d67d98?w=400&q=80",
                     StockStatus = "Available",
                     StockCount = 6,
                     Condition = "M"

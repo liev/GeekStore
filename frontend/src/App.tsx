@@ -1,5 +1,6 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import Catalog from './pages/Catalog';
+import ProductDetail from './pages/ProductDetail';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
@@ -62,6 +63,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/catalog" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Catalog /></div>} />
+        <Route path="/catalog/:id" element={<ProductDetail />} />
         <Route path="/my-purchases" element={<ProtectedRoute><div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><MyPurchases /></div></ProtectedRoute>} />
         <Route path="/profile/:id" element={<div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Profile /></div>} />
         <Route path="/dashboard" element={<ProtectedRoute><div className="relative"><div className="bg-scanlines" /><div className="bg-vaporwave-grid opacity-30 fixed inset-0" /><Dashboard /></div></ProtectedRoute>} />

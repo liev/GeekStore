@@ -201,7 +201,8 @@ namespace GoblinSpot.Api.Controllers
                 return BadRequest(new { message = "No se pudo verificar el pago con PayPal. Intenta de nuevo o contacta soporte." });
             }
 
-            user.Role = "Seller";
+            // El rol es el nombre del plan de suscripción (ej. "Goblin Worker")
+            user.Role = request.Plan;
             user.SubscriptionPlan = request.Plan;
             user.MonthlyFee = crcPrice;          // Store actual CRC price (preserves founder rate)
             user.SubscriptionEndDate = DateTime.UtcNow.AddDays(30);

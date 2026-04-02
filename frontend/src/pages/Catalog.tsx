@@ -44,14 +44,17 @@ function ProductCard({ product, onAddToCart, ratingData, onReport }: { product: 
     };
     const cColor = conditionColors[condition] || conditionColors['NM'];
 
-    const handleAdd = () => {
+    const handleAdd = (e: React.MouseEvent) => {
+        e.stopPropagation();
         onAddToCart(product, qty);
         setAdded(true);
         setTimeout(() => setAdded(false), 1400);
     };
 
     return (
-        <div className="bg-slate-900/80 rounded-xl overflow-hidden border border-slate-800 hover:border-slate-600 transition-all duration-200 group flex flex-col">
+        <div
+            onClick={() => navigate(`/catalog/${product.id}`)}
+            className="bg-slate-900/80 rounded-xl overflow-hidden border border-slate-800 hover:border-neon-blue/50 transition-all duration-200 group flex flex-col cursor-pointer hover:shadow-lg hover:shadow-neon-blue/10 hover:-translate-y-0.5">
             {/* Image area */}
             <div className="relative aspect-square overflow-hidden bg-slate-950 flex-shrink-0"
                 onMouseEnter={() => images.length > 1 && setImgIdx(1)}
@@ -66,6 +69,12 @@ function ProductCard({ product, onAddToCart, ratingData, onReport }: { product: 
                 <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-slate-900/80 text-neon-yellow px-2 py-0.5 rounded-full">
                     {product.categoryEntity?.name || 'Varios'}
                 </span>
+                {/* Intercambio badge */}
+                {product.listingType === 'Trade' && (
+                    <span className="absolute bottom-1.5 left-1.5 text-[10px] font-bold bg-purple-600/90 text-white px-2 py-0.5 rounded-full">
+                        🔄 INTERCAMBIO
+                    </span>
+                )}
                 {/* Low-stock flash */}
                 {isLowStock && (
                     <span className="absolute top-1.5 right-1.5 text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full animate-pulse">
@@ -104,13 +113,13 @@ function ProductCard({ product, onAddToCart, ratingData, onReport }: { product: 
                                 <div className="flex items-center gap-2 bg-slate-950/50 rounded-lg p-1 border border-slate-800">
                                     <button 
                                         disabled={qty <= 1}
-                                        onClick={() => setQty(q => Math.max(1, q - 1))}
+                                        onClick={(e) => { e.stopPropagation(); setQty(q => Math.max(1, q - 1)); }}
                                         className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white disabled:opacity-30"
                                     > - </button>
                                     <span className="text-[11px] font-bold text-slate-200 w-4 text-center">{qty}</span>
                                     <button 
                                         disabled={qty >= maxStock}
-                                        onClick={() => setQty(q => Math.min(maxStock, q + 1))}
+                                        onClick={(e) => { e.stopPropagation(); setQty(q => Math.min(maxStock, q + 1)); }}
                                         className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white disabled:opacity-30"
                                     > + </button>
                                 </div>

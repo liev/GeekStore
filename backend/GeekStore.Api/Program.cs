@@ -48,7 +48,7 @@ builder.Services.AddAuthentication(options =>
 // Configure CORS — origins read from configuration, fallback to localhost:5173
 var allowedOriginsRaw = builder.Configuration["AllowedOrigins"];
 var allowedOrigins = string.IsNullOrWhiteSpace(allowedOriginsRaw)
-    ? new[] { "http://localhost:5173" }
+    ? new[] { "http://localhost:5173", "http://localhost:5174" }
     : allowedOriginsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 builder.Services.AddCors(options =>
@@ -80,9 +80,15 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddHealthChecks();
 
 // DI - Database (PostgreSQL)
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? "SET_VIA_ENV_VAR__";
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
+if (string.IsNullOrEmpty(connectionString))
+{
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+}
+if (string.IsNullOrEmpty(connectionString) || connectionString.StartsWith("SET_VIA_ENV_VAR__"))
+{
+    throw new InvalidOperationException("DATABASE_URL environment variable must be set, or DefaultConnection in appsettings must not be a placeholder.");
+}
 builder.Services.AddDbContext<GoblinSpotDbContext>(options =>
     options.UseNpgsql(connectionString));
 

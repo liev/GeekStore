@@ -36,18 +36,18 @@ namespace GoblinSpot.Api.Services
                         var dbContext = scope.ServiceProvider.GetRequiredService<GoblinSpotDbContext>();
                         var notificationRepo = scope.ServiceProvider.GetRequiredService<INotificationRepository>();
 
-                        // Find sellers whose subscription has expired
+                        // Find mercaderes cuya suscripción expiró
                         var now = DateTime.UtcNow;
                         var expiredSellers = await dbContext.Users
-                            .Where(u => u.Role == "Seller" && u.SubscriptionEndDate.HasValue && u.SubscriptionEndDate.Value < now)
+                            .Where(u => IsSellerRole(u.Role) && u.SubscriptionEndDate.HasValue && u.SubscriptionEndDate.Value < now)
                             .ToListAsync(stoppingToken);
 
                         foreach (var seller in expiredSellers)
                         {
-                            _logger.LogInformation("Seller {SellerId} ({Email}) subscription expired. Changing role to Buyer.", seller.Id, seller.Email);
-                            
-                            // Change Role to Buyer
-                            seller.Role = "Buyer";
+                            _logger.LogInformation("Mercader {SellerId} ({Email}) suscripción expirada. Cambiando rol a Forastero.", seller.Id, seller.Email);
+
+                            // Demote a Forastero
+                            seller.Role = "Forastero";
                             seller.AutoRenew = false;
                             
                             // Suspend products
@@ -90,5 +90,8 @@ namespace GoblinSpot.Api.Services
                 await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken);
             }
         }
+
+        private static bool IsSellerRole(string? role) =>
+            role is "Goblin Worker" or "Goblin Mage" or "Goblin Warlord" or "Goblin King";
     }
 }

@@ -30,7 +30,8 @@ export default function Dashboard() {
     const [paypalMessage, setPaypalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     // Subscription & Role State
-    const [userRole, setUserRole] = useState<string>('Buyer');
+    const [userRole, setUserRole] = useState<string>('Forastero');
+    const isSellerRole = (r: string) => ['Goblin Worker', 'Goblin Mage', 'Goblin Warlord', 'Goblin King'].includes(r);
     const [subPlan, setSubPlan] = useState<string>('Ninguno');
     const [subEndDate, setSubEndDate] = useState<string | null>(null);
     const [subAutoRenew, setSubAutoRenew] = useState<boolean>(false);
@@ -52,6 +53,7 @@ export default function Dashboard() {
     const [description, setDescription] = useState('');
     const [stockCount, setStockCount] = useState<number>(1);
     const [sellerNote, setSellerNote] = useState('');
+    const [listingType, setListingType] = useState<'Sale' | 'Trade'>('Sale');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
@@ -194,11 +196,11 @@ export default function Dashboard() {
                         setSubFeeUSD(currentPlanInfo.usdPrice.toFixed(2));
                     }
 
-                    if (me.role === 'Buyer' && activeTab === 'inventory') {
+                    if (!isSellerRole(me.role) && activeTab === 'inventory') {
                         setActiveTab('subscription');
                     }
 
-                    if (me.role === 'Seller') {
+                    if (isSellerRole(me.role)) {
                         const data = await sellersApi.getMetrics(token);
                         setMetrics(data);
                     }
@@ -211,12 +213,12 @@ export default function Dashboard() {
 
                     // Check for pending seller upgrade (from registration flow)
                     const pending = localStorage.getItem('pendingSellerUpgrade');
-                    if (pending && me.role === 'Buyer') {
+                    if (pending && !isSellerRole(me.role)) {
                         try {
                             const { plan, orderId } = JSON.parse(pending);
                             const msg = await usersApi.upgradeToSeller(plan, orderId, token);
                             localStorage.removeItem('pendingSellerUpgrade');
-                            setUserRole('Seller');
+                            setUserRole(plan);
                             setSubPlan(plan);
                             setSubAutoRenew(true);
                             setSubEndDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
@@ -332,7 +334,7 @@ export default function Dashboard() {
 
                 {/* Dashboard Nav */}
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 font-sans font-medium text-base sm:text-lg">
-                    {userRole === 'Seller' && (
+                    {isSellerRole(userRole) && (
                         <>
                             <button
                                 onClick={() => setActiveTab('inventory')}
@@ -372,7 +374,7 @@ export default function Dashboard() {
                     >
                         Perfil de Vendedor
                     </button>
-                    {userRole === 'Seller' && (
+                    {isSellerRole(userRole) && (
                         <button
                             onClick={() => setActiveTab('orders')}
                             className={`px-4 py-3 sm:px-8 sm:py-3 rounded-xl sm:rounded-full transition-all duration-300 w-full sm:w-auto text-center ${activeTab === 'orders'
@@ -692,6 +694,25 @@ export default function Dashboard() {
                                     ></textarea>
                                 </div>
 
+                                {/* Tipo de publicación */}
+                                <div className="col-span-1 md:col-span-2">
+                                    <label className="block text-slate-300 font-sans font-medium text-sm mb-2">Tipo de Publicación</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button type="button" onClick={() => setListingType('Sale')}
+                                            className={`flex flex-col items-center py-3 rounded-xl border-2 transition-all text-sm font-bold ${listingType === 'Sale' ? 'border-neon-blue bg-neon-blue/10 text-neon-blue' : 'border-slate-700 text-slate-400 hover:border-slate-500'}`}>
+                                            <span className="text-lg mb-1">🛒</span>
+                                            <span>VENTA</span>
+                                            <span className="font-sans font-normal text-slate-400 text-[11px] mt-0.5">Consume cupo del plan</span>
+                                        </button>
+                                        <button type="button" onClick={() => setListingType('Trade')}
+                                            className={`flex flex-col items-center py-3 rounded-xl border-2 transition-all text-sm font-bold ${listingType === 'Trade' ? 'border-purple-400 bg-purple-400/10 text-purple-400' : 'border-slate-700 text-slate-400 hover:border-slate-500'}`}>
+                                            <span className="text-lg mb-1">🔄</span>
+                                            <span>INTERCAMBIO</span>
+                                            <span className="font-sans font-normal text-purple-400 text-[11px] mt-0.5">No consume cupo</span>
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div className="col-span-1 md:col-span-2 pt-6 mt-2 border-t border-slate-700/50">
                                     {uploadError && (
                                         <div className="mb-4 bg-red-500/10 border border-red-500/50 text-red-500 p-4 rounded-lg font-sans text-sm font-semibold animate-pulse flex items-start gap-2 whitespace-pre-line">
@@ -720,7 +741,8 @@ export default function Dashboard() {
                                                     imageUrl3: imageUrls[2] || '',
                                                     sellerNote,
                                                     stockStatus: 'Available',
-                                                    stockCount: stockCount
+                                                    stockCount: stockCount,
+                                                    listingType
                                                 };
                                                 // Real creation using authenticated token
                                                 const created = await catalogApi.createProduct(newProduct, token!);
@@ -768,7 +790,7 @@ export default function Dashboard() {
                                 </div>
                             )}
 
-                            {userRole === 'Seller' ? (
+                            {isSellerRole(userRole) ? (
                                 <>
                                     {/* Current plan status */}
                                     <div className="glass-panel p-6 rounded-2xl border border-yellow-400/50 relative overflow-hidden shadow-[0_0_30px_rgba(250,204,21,0.15)] w-full text-center">
@@ -979,7 +1001,7 @@ export default function Dashboard() {
                                                             try {
                                                                 const order = await actions.order.capture();
                                                                 const msg = await usersApi.upgradeToSeller(selectedNewPlan.name, order.id || '', token!);
-                                                                setUserRole('Seller');
+                                                                setUserRole(selectedNewPlan.name);
                                                                 setSubPlan(selectedNewPlan.name);
                                                                 setSubAutoRenew(true);
                                                                 setSubEndDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());

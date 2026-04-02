@@ -13,8 +13,8 @@ namespace GoblinSpot.Core.Entities
         [JsonIgnore]
         public string PasswordHash { get; set; } = string.Empty;
         
-        // Roles: "Admin", "Seller"
-        public string Role { get; set; } = "Seller";
+        // Roles: "Admin", "Forastero", "Goblin Worker", "Goblin Mage", "Goblin Warlord", "Goblin King"
+        public string Role { get; set; } = "Forastero";
         
         // To suspend/ban users manually
         public bool IsActive { get; set; } = true;
