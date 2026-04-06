@@ -23,7 +23,7 @@ export default function Dashboard() {
     // Seller Auth State
     const [sellerId, setSellerId] = useState<number | null>(null);
     const [token, setToken] = useState<string | null>(null);
-    const [sellerFee, setSellerFee] = useState<string>('0');
+    const [_sellerFee, setSellerFee] = useState<string>('0');
     const [subFeeUSD, setSubFeeUSD] = useState<string>('10.00');
     const [paypalClientId, setPaypalClientId] = useState<string>('test');
     const [paypalLoading, setPaypalLoading] = useState<boolean>(false);

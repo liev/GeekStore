@@ -5,6 +5,7 @@ using GoblinSpot.Infrastructure.Data;
 using GoblinSpot.Infrastructure.Repositories;
 using GoblinSpot.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -119,14 +120,25 @@ builder.Services.AddHostedService<GoblinSpot.Api.Services.SubscriptionWorker>();
 
 var app = builder.Build();
 
-// Auto-create/migrate the database on startup (dev convenience)
+// Auto-create/migrate the database on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GoblinSpotDbContext>();
-    db.Database.EnsureCreated();
+    if (app.Environment.IsDevelopment())
+        db.Database.EnsureCreated();
+    else
+        db.Database.Migrate();
 }
 
-app.UseHttpsRedirection();
+// Forward headers from Nginx/Cloudflare so rate limiting uses real client IP
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
+// Only redirect to HTTPS in development; in production Nginx/Cloudflare handle SSL
+if (app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 
 app.UseCors("AllowFrontend");
 

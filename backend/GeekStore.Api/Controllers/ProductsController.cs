@@ -290,6 +290,7 @@ namespace GoblinSpot.Api.Controllers
             }
         }
 
+#if DEBUG
         [Authorize(Roles = "Admin")]
         [HttpPost("update-all-test-images")]
         public async Task<IActionResult> UpdateAllTestImages()
@@ -346,6 +347,7 @@ namespace GoblinSpot.Api.Controllers
             }
             return Ok(new { message = $"Updated {count} products" });
         }
+#endif
 
         public class ReportProductRequest
         {

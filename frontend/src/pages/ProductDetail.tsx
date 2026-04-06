@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, ShoppingCart, Flag, MessageCircle, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { ArrowLeft, User, ShoppingCart, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { catalogApi, reviewsApi, type Product, type ReviewSummary } from '../api/client';
 import { StarRatingCompact } from './Profile';
 

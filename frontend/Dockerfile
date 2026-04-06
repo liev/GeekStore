@@ -2,6 +2,13 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# Accept API URL as build arg (Vite injects env vars at build time)
+ARG VITE_API_BASE_URL=http://localhost:5242/api
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+# Install native build dependencies for the 'canvas' package (node-gyp)
+RUN apk add --no-cache python3 make g++ pkgconf pixman-dev cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev
+
 COPY package.json package-lock.json ./
 RUN npm ci
 

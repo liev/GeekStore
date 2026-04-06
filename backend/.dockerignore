@@ -1,0 +1,9 @@
+**/bin
+**/obj
+**/.vs
+**/node_modules
+**/*.user
+**/GeekStore.Core.csproj
+**/GeekStore.Application.csproj
+**/GeekStore.Infrastructure.csproj
+**/GeekStore.Api.csproj
