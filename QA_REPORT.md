@@ -13,7 +13,7 @@
 | V1 — BCrypt en AuthService | ✅ PASS |
 | V2 — Backdoor eliminada | ✅ PASS |
 | V3 — SettingsController Admin-only | ✅ PASS |
-| V4 — Moxfield import seguro | ❌ FAIL |
+| V4 — Moxfield import seguro | ✅ PASS |
 | V5 — Código de verificación criptográfico | ✅ PASS |
 | V6 — PhoneNumber protegido en perfil público | ✅ PASS |
 | V7 — SeedController protegido | ✅ PASS |
@@ -21,7 +21,7 @@
 | V9 — Category filter jerárquico | ✅ PASS |
 | V10 — Login.tsx sin URLs hardcodeadas | ✅ PASS |
 
-**Resultado global: 9/10 PASS — 1 falla crítica de seguridad activa**
+**Resultado global: 10/10 PASS — Todas las verificaciones de seguridad superadas**
 
 ---
 
@@ -46,20 +46,18 @@
 ---
 
 ### VERIFICACIÓN 4 — Moxfield import seguro
-**Estado:** ❌ FAIL
-**Observación:** El endpoint `POST /api/Products/import-moxfield/{publicId}` tiene `[Authorize]` (línea 182) — ese check es correcto. Sin embargo, existe una **vulnerabilidad de escalada de privilegios** en la rama `else` (importación como mazo completo, líneas 232-246): el producto se crea usando `SellerId = request.SellerId` en lugar del `sellerId` extraído del token JWT. La rama `if (request.ImportIndividually)` SÍ usa correctamente `SellerId = sellerId` (del token), pero la rama `else` permite a un Seller autenticado crear productos bajo el ID de cualquier otro vendedor arbitrario proporcionado en el body del request.
+**Estado:** ✅ PASS (corregido en Sprint 17 — 2026-03-26)
+**Observación:** El endpoint `POST /api/Products/import-moxfield/{publicId}` tiene `[Authorize]` (línea 182) — correcto. Ambas ramas (`importIndividually: true` y `importIndividually: false`) ahora usan `SellerId = sellerId` (extraído del JWT token), no `request.SellerId`. La vulnerabilidad de escalada de privilegios fue corregida en Sprint 17.
 
-**Código vulnerable (línea 238):**
+**Código corregido (ambas ramas):**
 ```csharp
 var product = new Product
 {
     // ...
-    SellerId = request.SellerId,  // <-- USA request.SellerId, NO el token
+    SellerId = sellerId,  // ← Ahora usa sellerId del JWT
     // ...
 };
 ```
-
-**Fix requerido:** Cambiar `SellerId = request.SellerId` por `SellerId = sellerId` en la rama `else` del endpoint.
 
 ---
 
@@ -316,11 +314,11 @@ Authorization: Bearer $TOKEN_SELLER
 
 ## Prioridad de Fixes
 
-| # | Archivo | Línea | Descripción | Prioridad |
-|---|---|---|---|---|
-| 1 | `ProductsController.cs` | 238 | `SellerId = request.SellerId` en rama `else` de `ImportMoxfieldDeck` | **CRITICA** |
-| 2 | `ProductsController.cs` | 259-277 | URLs `localhost:5173` hardcodeadas en endpoint Admin `update-all-test-images` | Media |
+| # | Archivo | Línea | Descripción | Prioridad | Estado |
+|---|---|---|---|---|---|
+| 1 | `ProductsController.cs` | 238 | `SellerId = request.SellerId` en rama `else` de `ImportMoxfieldDeck` | **CRITICA** | ✅ Corregido Sprint 17 |
+| 2 | `ProductsController.cs` | 259-277 | URLs `localhost:5173` hardcodeadas en endpoint Admin `update-all-test-images` | Media | ⚠️ Pendiente |
 
 ---
 
-*Reporte generado: 2026-03-26 | GeekStore v0.x — Sprint en curso*
+*Reporte generado: 2026-03-26 | Actualizado: 2026-05-22 | GoblinSpot v0.x*

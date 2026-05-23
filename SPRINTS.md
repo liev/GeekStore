@@ -1,7 +1,7 @@
 # GeekStore — Plan de Sprints Completo
 
-**Estado actual:** ~75% production-ready
-**Última actualización:** 2026-03-26
+**Estado actual:** ~85% production-ready
+**Última actualización:** 2026-05-22
 **Convención de tamaño:** XS(<1h) S(1-2h) M(3-5h) L(6-10h) XL(10h+)
 
 ---
@@ -71,32 +71,21 @@
     "Cloudinary": { "CloudName": "", "ApiKey": "", "ApiSecret": "" },
     "Email": { "SmtpUser": "", "SmtpPassword": "" } }
   ```
-- [ ] **[S]** `Program.cs`: CORS dinámico — leer dominios permitidos desde config en vez de hardcoded `localhost:5173`
-- [ ] **[S]** `Program.cs`: agregar `app.MapHealthChecks("/health")` con paquete `Microsoft.AspNetCore.Diagnostics.HealthChecks`
-- [ ] **[M]** Rate limiting en auth — agregar `Microsoft.AspNetCore.RateLimiting`, limitar `/Auth/login` a 5 req/min por IP
+- [x] **[S]** `Program.cs`: CORS dinámico — lee dominios de `AllowedOrigins` config, fallback a localhost
+- [x] **[S]** `Program.cs`: `app.MapHealthChecks("/health")` implementado
+- [x] **[M]** Rate limiting en auth — `AddFixedWindowLimiter("auth")` con 5 req/min, aplicado a login, register y resend-code
 - [ ] **[S]** `SeedController.cs`: envolver con `#if DEBUG` para que no compile en Release
-- [ ] **[S]** Validar que `app.UseHttpsRedirection()` funciona correctamente en Docker con proxy reverso
+- [x] **[S]** `Program.cs`: HTTPS redirect solo en Development; en producción Nginx/Cloudflare maneja SSL
 
 ### Config / DevOps — raíz del repo
-- [ ] **[S]** `.env.example`: lista de todas las variables necesarias sin valores reales
-  ```
-  JWT_KEY=
-  GEMINI_API_KEY=
-  CLOUDINARY_CLOUD_NAME=
-  CLOUDINARY_API_KEY=
-  CLOUDINARY_API_SECRET=
-  SMTP_USER=
-  SMTP_PASSWORD=
-  POSTGRES_PASSWORD=
-  PAYPAL_CLIENT_ID=
-  ```
-- [ ] **[XS]** `docker-compose.yml`: cambiar `POSTGRES_PASSWORD: geekstore123` → `${POSTGRES_PASSWORD}`
-- [ ] **[S]** `docker-compose.yml`: agregar sección `environment` al servicio backend leyendo del `.env`
-- [ ] **[XS]** `.gitignore`: asegurarse que `.env`, `.env.local`, `appsettings.Production.json` están excluidos
+- [x] **[S]** `.env.example`: lista completa de variables (JWT, Gemini, Cloudinary, SMTP, PayPal, Postgres)
+- [x] **[XS]** `docker-compose.yml`: usa `${POSTGRES_PASSWORD:?required}` (no hardcodeado)
+- [x] **[S]** `docker-compose.yml`: sección `environment` completa con variables del `.env`
+- [x] **[XS]** `.gitignore`: `.env`, `.env.*`, `appsettings.Development.json`, `appsettings.Production.json` excluidos
 
 ### Frontend — `frontend/`
-- [ ] **[S]** `.env.example`: documentar `VITE_PAYPAL_CLIENT_ID=`, `VITE_API_BASE_URL=`
-- [ ] **[S]** `src/App.tsx` o `main.tsx`: agregar React Error Boundary global para capturar crashes sin pantalla blanca
+- [x] **[S]** `.env.example`: documenta `VITE_API_BASE_URL=`
+- [x] **[S]** `App.tsx`: `<ErrorBoundary>` global envuelve `<Routes>`
 - [ ] **[XS]** `vite.config.ts`: configurar `build.sourcemap: false` para producción
 
 ### Criterios de aceptación
@@ -573,20 +562,20 @@
 
 | Sprint | Descripción | Días | Estado |
 |--------|-------------|------|--------|
-| S0 | Config producción | 2-3 | 🔴 BLOQUEADOR |
-| S1 | UI Disputas | 1-2 | 🟠 Próximo |
-| S2 | Delivery Points | 3-4 | 🟠 Alta |
-| S3 | PayPal real | 4-5 | 🟡 Media |
-| S4 | Reembolsos | 5-7 | 🟡 Media |
-| S5 | Reportes | 3-4 | 🟡 Media |
-| S6 | Wishlist | 2-3 | 🟡 Media |
-| S7 | Bloqueos | 2-3 | 🟢 Baja |
-| S8 | Finanzas | 3-4 | 🟢 Baja |
-| S9 | 2FA | 3-4 | 🟢 Baja |
-| S10 | Push notifications | 3-4 | 🟢 Baja |
-| S11 | UI/UX polish | 3-4 | 🔵 Futuro |
-| S12 | SEO/Performance | 5-7 | 🔵 Futuro |
-| S13 | Chat P2P | 7-10 | 🔵 Futuro |
+| S0 | Config producción | 2-3 | ✅ ~90% completado |
+| S1 | UI Disputas | 1-2 | ✅ Completado |
+| S2 | Delivery Points | 3-4 | ✅ Completado |
+| S3 | PayPal real | 4-5 | ✅ Completado |
+| S4 | Reembolsos | 5-7 | ✅ Completado |
+| S5 | Reportes | 3-4 | ✅ Completado |
+| S6 | Wishlist | 2-3 | 🟡 Pendiente |
+| S7 | Bloqueos | 2-3 | ✅ Completado |
+| S8 | Finanzas | 3-4 | 🟢 Pendiente |
+| S9 | 2FA | 3-4 | ✅ Completado |
+| S10 | Push notifications | 3-4 | 🟢 Pendiente |
+| S11 | UI/UX polish | 3-4 | 🟢 Pendiente |
+| S12 | SEO/Performance | 5-7 | 🟢 Pendiente |
+| S13 | Chat P2P | 7-10 | 🟢 Pendiente |
 | DEPLOY | Lanzamiento | 1-2 | 🚀 Post-S0 |
 
 **MVP mínimo deployable:** S0 + DEPLOY = 3-5 días

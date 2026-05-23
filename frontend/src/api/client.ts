@@ -409,8 +409,48 @@ export const adminApi = {
     }
 };
 
+export interface ProductStatDto {
+    id: number;
+    name: string;
+    cartAdditionCount: number;
+    status: string;
+    daysOld: number;
+}
+
+export interface SellerStatDto {
+    sellerId: number;
+    sellerName: string;
+    products: ProductStatDto[];
+    monthlyFee: number | null;
+    benefits: string | null;
+}
+
+export interface AdminInventoryStatsDto {
+    sellers: SellerStatDto[];
+    totalProducts: number;
+    totalCartAdditions: number;
+}
+
+export interface SellerRecommendationDto {
+    sellerId: number;
+    sellerName: string;
+    category: string;
+    reason: string;
+    suggestedBenefits: string;
+}
+
+export interface SellerAIAnalysisDto {
+    recommendations: SellerRecommendationDto[];
+    globalSummary: string;
+}
+
+export interface SellerConfigUpdateDto {
+    monthlyFee: number | null;
+    benefits: string | null;
+}
+
 export const adminDashboardApi = {
-    getStats: async (token: string): Promise<any> => {
+    getStats: async (token: string): Promise<AdminInventoryStatsDto | null> => {
         try {
             const res = await fetchApi(`${API_BASE_URL}/AdminDashboard/inventory-stats`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -422,7 +462,7 @@ export const adminDashboardApi = {
             return null;
         }
     },
-    getAIAnalysis: async (token: string): Promise<any> => {
+    getAIAnalysis: async (token: string): Promise<SellerAIAnalysisDto> => {
         try {
             const res = await fetchApi(`${API_BASE_URL}/AdminDashboard/seller-ai-analysis`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -434,7 +474,7 @@ export const adminDashboardApi = {
             return { globalSummary: "Error", recommendations: [] };
         }
     },
-    updateSellerConfig: async (id: number, config: any, token: string): Promise<boolean> => {
+    updateSellerConfig: async (id: number, config: SellerConfigUpdateDto, token: string): Promise<boolean> => {
         try {
             const res = await fetchApi(`${API_BASE_URL}/AdminDashboard/update-seller-config/${id}`, {
                 method: 'PUT',

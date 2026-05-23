@@ -1,73 +1,53 @@
-# React + TypeScript + Vite
+# Goblin Spot — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend de Goblin Spot construido con **React 19**, **TypeScript**, **Tailwind CSS 4** y **Vite 7**.
 
-Currently, two official plugins are available:
+## Desarrollo
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+# Instalar dependencias
+npm install
 
-## React Compiler
+# Configurar variable de entorno
+cp .env.example .env.local
+# Editar VITE_API_BASE_URL si el backend no está en localhost:5242
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Ejecutar servidor de desarrollo
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Scripts
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Script | Descripción |
+|---|---|
+| `npm run dev` | Servidor de desarrollo con HMR |
+| `npm run build` | Build de producción (TypeScript + Vite) |
+| `npm run lint` | ESLint |
+| `npm run preview` | Preview del build de producción |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Estructura
+
 ```
+src/
+├── api/          # Cliente API centralizado (client.ts)
+├── components/   # Componentes reutilizables
+│   ├── ErrorBoundary.tsx   # Captura errores de render
+│   ├── ProtectedRoute.tsx  # Route guard con verificación JWT/rol
+│   └── NotificationBell.tsx # Campana de notificaciones con polling
+├── pages/        # Páginas principales
+│   ├── Catalog.tsx         # Catálogo público con filtros
+│   ├── Dashboard.tsx       # Panel del vendedor
+│   ├── AdminPanel.tsx      # Panel administrativo (solo Admin)
+│   ├── Login.tsx           # Login + Registro + Verificación + 2FA
+│   ├── MyPurchases.tsx     # Compras, disputas y reembolsos
+│   ├── Profile.tsx         # Perfil público de vendedor
+│   └── ProductDetail.tsx   # Detalle de producto
+└── store/        # Zustand stores
+    └── authStore.ts        # Estado centralizado de autenticación
+```
+
+## Variables de Entorno
+
+| Variable | Descripción | Default |
+|---|---|---|
+| `VITE_API_BASE_URL` | URL base del API backend | `http://localhost:5242/api` |

@@ -1,12 +1,16 @@
-# Informe de Arquitectura — GeekStore
-**Fecha:** 2026-03-26
+# Informe de Arquitectura — GoblinSpot (GeekStore)
+**Fecha original:** 2026-03-26
+**Última actualización:** 2026-05-22
 **Evaluado por:** Agente Arquitecto
 
 ---
 
 ## Resumen Ejecutivo
 
-GeekStore es un marketplace P2P funcional con una base arquitectónica razonable (Clean Architecture, JWT, paginación, workers de background), pero presenta riesgos críticos de seguridad que deben resolverse antes de cualquier despliegue en producción. El problema más grave es la ausencia total de hashing de contraseñas: las credenciales se almacenan en texto plano y se comparan directamente. Adicionalmente, existe una puerta trasera de administrador hardcodeada en el código de producción. En el frontend, el árbol de rutas carece de Route Guards, la API base está hardcodeada a localhost, y los tipos `any` proliferan en componentes críticos del panel de administración. La resiliencia del sistema ante errores de red es inconsistente, con varios endpoints que silencian excepciones en lugar de propagarlas. Se estima que el sistema necesita al menos 2 sprints de correcciones de seguridad y arquitectura antes de ser desplegable de forma segura.
+> [!IMPORTANT]
+> **Actualización 2026-05-22:** Los hallazgos críticos de seguridad (A1-A2, A3-A7, A9) y resiliencia (D1-D2, D5) fueron corregidos en los Sprints 16-17. El reporte original se conserva como referencia histórica; cada sección indica su estado actual.
+
+GoblinSpot (antes GeekStore) es un marketplace P2P funcional con una base arquitectónica sólida (Clean Architecture, JWT con BCrypt, paginación, workers de background, rate limiting, health checks). Las correcciones de seguridad críticas ya fueron aplicadas: contraseñas hasheadas con BCrypt, puerta trasera eliminada, verificación de PayPal implementada, Route Guards en frontend, y ErrorBoundary global. Los principales gaps pendientes son: optimización de queries (N+1 en catálogo), refactoring de controladores que acceden directamente a DbContext, y ausencia de tests automatizados.
 
 ---
 
@@ -339,41 +343,41 @@ GeekStore es un marketplace P2P funcional con una base arquitectónica razonable
 
 ## Matriz de Prioridad
 
-| ID | Descripción | Impacto | Esfuerzo | Sprint Recomendado |
+| ID | Descripción | Impacto | Esfuerzo | Estado |
 |---|---|---|---|---|
-| A1 | Contraseñas en texto plano — sin BCrypt | CRÍTICO | S | Inmediato |
-| A2 | Puerta trasera hardcodeada en AuthService | CRÍTICO | XS | Inmediato |
-| A3 | Upgrade a Seller sin verificar pago PayPal | CRÍTICO | M | Inmediato |
-| A7 | JWT con fallback hardcodeado público | ALTO | XS | Inmediato |
-| A4 | PUT /api/Settings/seller-fee sin rol Admin | ALTO | XS | Sprint Actual |
-| A5 | import-moxfield sin auth y SellerId spoofable | ALTO | S | Sprint Actual |
-| D2 | Sin Route Guards en frontend | ALTO | S | Sprint Actual |
-| E1 | Full table scan en cada login/registro | ALTO | M | Sprint Actual |
-| E4 | Falta índices en columnas de búsqueda | ALTO | S | Sprint Actual |
-| B1 | Controladores acceden directamente a DbContext | ALTO | L | Sprint +1 |
-| B3 | ListAllAsync sin paginación — N+1 latente | ALTO | M | Sprint +1 |
-| D3 | N+1 de ratings en Catalog frontend | ALTO | M | Sprint +1 |
-| D1 | ErrorBoundary no aplicado en árbol de rutas | ALTO | XS | Sprint Actual |
-| A6 | Código verificación no criptográfico | MEDIO | XS | Sprint +1 |
-| A8 | Sin rate limit en resend-code | MEDIO | XS | Sprint Actual |
-| A9 | PhoneNumber expuesto en perfil público | MEDIO | XS | Sprint Actual |
-| B5 | Entidad Product aceptada directamente sin DTO | MEDIO | M | Sprint +1 |
-| B2 | AdminDashboard llama internamente a Action | MEDIO | S | Sprint +1 |
-| B4 | Role como string libre sin constantes | MEDIO | S | Sprint +1 |
-| D4 | SubscriptionWorker guarda múltiples veces | MEDIO | S | Sprint +1 |
-| D5 | authApi.login silencia error EMAIL_NOT_VERIFIED | MEDIO | XS | Sprint Actual |
-| E2 | AdminDashboard dos full table scans | ALTO | M | Sprint +1 |
-| E3 | GetSellerRatingSummary carga todos reviews | MEDIO | S | Sprint +1 |
-| C1 | Tipos `any` en adminDashboardApi y AdminPanel | MEDIO | M | Sprint +1 |
-| B6 | Duplicación lógica UpdateSellerFee | MEDIO | XS | Sprint Actual |
-| F1 | Registro no muestra mensaje de error específico | MEDIO | S | Sprint +1 |
-| F4 | alert() en lugar de feedback inline | MEDIO | M | Sprint +1 |
-| C4 | window.location.reload() post-disputa | BAJO | XS | Sprint +2 |
-| C5 | Console.WriteLine en lugar de ILogger | BAJO | S | Sprint +2 |
-| C2 | myDisputes tipado como any[] | BAJO | XS | Sprint +2 |
-| C3 | Endpoint update-all-test-images en producción | BAJO | XS | Sprint +2 |
-| E5 | NotificationBell hace 2 requests por poll | BAJO | XS | Sprint +2 |
-| F2 | Checkout no pre-llena datos del usuario auth | BAJO | S | Sprint +2 |
+| A1 | Contraseñas en texto plano — sin BCrypt | CRÍTICO | S | ✅ Corregido Sprint 16 |
+| A2 | Puerta trasera hardcodeada en AuthService | CRÍTICO | XS | ✅ Corregido Sprint 16 |
+| A3 | Upgrade a Seller sin verificar pago PayPal | CRÍTICO | M | ✅ Corregido Sprint 3 |
+| A7 | JWT con fallback hardcodeado público | ALTO | XS | ✅ Corregido Sprint 16 |
+| A4 | PUT /api/Settings/seller-fee sin rol Admin | ALTO | XS | ✅ Corregido Sprint 16 |
+| A5 | import-moxfield sin auth y SellerId spoofable | ALTO | S | ✅ Corregido Sprint 17 |
+| D2 | Sin Route Guards en frontend | ALTO | S | ✅ Corregido Sprint 17 |
+| E1 | Full table scan en cada login/registro | ALTO | M | ✅ Corregido Sprint 17 |
+| E4 | Falta índices en columnas de búsqueda | ALTO | S | ⚠️ Pendiente |
+| B1 | Controladores acceden directamente a DbContext | ALTO | L | ⚠️ Pendiente |
+| B3 | ListAllAsync sin paginación — N+1 latente | ALTO | M | ⚠️ Pendiente (AdminDashboard) |
+| D3 | N+1 de ratings en Catalog frontend | ALTO | M | ⚠️ Pendiente |
+| D1 | ErrorBoundary no aplicado en árbol de rutas | ALTO | XS | ✅ Corregido Sprint 17 |
+| A6 | Código verificación no criptográfico | MEDIO | XS | ✅ Corregido Sprint 16 |
+| A8 | Sin rate limit en resend-code | MEDIO | XS | ✅ Corregido (actualización 2026-05-22) |
+| A9 | PhoneNumber expuesto en perfil público | MEDIO | XS | ✅ Corregido Sprint 16 |
+| B5 | Entidad Product aceptada directamente sin DTO | MEDIO | M | ⚠️ Pendiente |
+| B2 | AdminDashboard llama internamente a Action | MEDIO | S | ⚠️ Pendiente |
+| B4 | Role como string libre sin constantes | MEDIO | S | ⚠️ Pendiente |
+| D4 | SubscriptionWorker guarda múltiples veces | MEDIO | S | ⚠️ Pendiente |
+| D5 | authApi.login silencia error EMAIL_NOT_VERIFIED | MEDIO | XS | ✅ Corregido Sprint 17 |
+| E2 | AdminDashboard dos full table scans | ALTO | M | ⚠️ Pendiente |
+| E3 | GetSellerRatingSummary carga todos reviews | MEDIO | S | ⚠️ Pendiente |
+| C1 | Tipos `any` en adminDashboardApi y AdminPanel | MEDIO | M | ✅ Corregido (actualización 2026-05-22) |
+| B6 | Duplicación lógica UpdateSellerFee | MEDIO | XS | ✅ Corregido Sprint 17 |
+| F1 | Registro no muestra mensaje de error específico | MEDIO | S | ⚠️ Pendiente |
+| F4 | alert() en lugar de feedback inline | MEDIO | M | ⚠️ Pendiente |
+| C4 | window.location.reload() post-disputa | BAJO | XS | ✅ Corregido Sprint 17 |
+| C5 | Console.WriteLine en lugar de ILogger | BAJO | S | ⚠️ Pendiente |
+| C2 | myDisputes tipado como any[] | BAJO | XS | ✅ Corregido Sprint 17 |
+| C3 | Endpoint update-all-test-images en producción | BAJO | XS | ⚠️ Pendiente |
+| E5 | NotificationBell hace 2 requests por poll | BAJO | XS | ⚠️ Pendiente |
+| F2 | Checkout no pre-llena datos del usuario auth | BAJO | S | ⚠️ Pendiente |
 | F3 | Botón Admin visible para Sellers | BAJO | XS | Sprint +2 |
 | F5 | Sin feedback de carga al cambiar filtros | BAJO | XS | Sprint +2 |
 

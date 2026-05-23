@@ -116,6 +116,7 @@ namespace GoblinSpot.Api.Controllers
         }
 
         [HttpPost("resend-code")]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> ResendCode([FromBody] string email)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);

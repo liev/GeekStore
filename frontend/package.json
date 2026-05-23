@@ -11,8 +11,6 @@
   },
   "dependencies": {
     "@paypal/react-paypal-js": "^9.0.1",
-    "@stripe/react-stripe-js": "^5.6.1",
-    "@stripe/stripe-js": "^8.9.0",
     "@tailwindcss/vite": "^4.2.1",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.577.0",
